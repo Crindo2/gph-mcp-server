@@ -6,7 +6,7 @@
 
 const API_BASE = 'https://www.getpracticehelp.com/api';
 const AT_BASE = 'appvHqDMSu6aCwNxA';
-const AT_LOG_TABLE = 'tblMcpApiLogs'; // Create this table in Airtable
+const AT_LOG_TABLE = 'tbl5ae8t1PbK2AMkx';
 
 const SERVER_INFO = {
   protocolVersion: '2024-11-05',
