@@ -206,7 +206,7 @@ function computeSignalScore(args) {
 
 async function logToolCall(env, toolName, args, resultsCount, apiKey) {
   const atKey = env?.AIRTABLE_PAT;
-  if (!atKey) { console.error('logToolCall: AIRTABLE_PAT not set, env keys:', Object.keys(env || {})); return; }
+  if (!atKey) return;
   try {
     await fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_LOG_TABLE}`, {
       method: 'POST',
@@ -227,7 +227,7 @@ async function logToolCall(env, toolName, args, resultsCount, apiKey) {
         typecast: true
       })
     });
-  } catch (e) { console.error('logToolCall error:', e.message); }
+  } catch (e) { /* non-blocking */ }
 }
 
 // ── Request router ──
