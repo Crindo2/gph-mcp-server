@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Crindo2/gph-mcp-server",
+  "title": "GPH Intelligence — Healthcare Service Provider Finder",
+  "description": "Find healthcare service providers for medical practices. 100,000+ verified vendors.",
+  "version": "1.0.0",
+  "repository": {
+    "url": "https://github.com/Crindo2/gph-mcp-server",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://gph-mcp-server.pages.dev/mcp"
+    }
+  ]
+}
