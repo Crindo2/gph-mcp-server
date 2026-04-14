@@ -194,6 +194,29 @@ function getPrompt(name, args) {
   return null;
 }
 
+// ── KV Metering (Tier 2a) ──
+
+const FREE_LIMIT = 25;
+
+async function checkAndMeterCall(env, apiKey) {
+  const kv = env?.CALL_METER;
+  if (!kv) return { allowed: true, callCount: 0 }; // KV not bound, allow
+
+  const key = apiKey || 'anonymous';
+  const monthKey = `${key}:${new Date().toISOString().slice(0, 7)}`;
+  const current = parseInt(await kv.get(monthKey) || '0');
+
+  // Free tier: 25 calls/month
+  if (!apiKey && current >= FREE_LIMIT) {
+    return { allowed: false, callCount: current, reason: 'Free tier limit reached (25 calls/month). Get API access at https://www.getpracticehelp.com/api-access/' };
+  }
+
+  // TODO: Tier 2c — validate paid API keys against Airtable for higher limits
+
+  await kv.put(monthKey, String(current + 1), { expirationTtl: 60 * 60 * 24 * 45 });
+  return { allowed: true, callCount: current + 1 };
+}
+
 // ── MCP call logging to Airtable (Tier 1e) ──
 
 function computeSignalScore(args) {
@@ -250,8 +273,14 @@ async function handleMcpRequest(body, env, apiKey, ctx) {
     case 'tools/call': {
       const { name, arguments: args } = params || {};
       if (!name) return jsonrpcError(id, -32602, 'Missing tool name');
+
+      // Check rate limit
+      const meter = await checkAndMeterCall(env, apiKey);
+      if (!meter.allowed) {
+        return jsonrpc(id, { content: [{ type: 'text', text: meter.reason }], isError: true });
+      }
+
       const result = await callTool(name, args || {});
-      // Log to Airtable (awaited to ensure it completes)
       await logToolCall(env, name, args || {}, 0, apiKey);
       return jsonrpc(id, result);
     }
