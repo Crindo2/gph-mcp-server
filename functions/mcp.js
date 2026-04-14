@@ -251,8 +251,8 @@ async function handleMcpRequest(body, env, apiKey, ctx) {
       const { name, arguments: args } = params || {};
       if (!name) return jsonrpcError(id, -32602, 'Missing tool name');
       const result = await callTool(name, args || {});
-      // Non-blocking log via waitUntil so it survives response
-      if (ctx) ctx.waitUntil(logToolCall(env, name, args || {}, 0, apiKey));
+      // Log to Airtable (awaited to ensure it completes)
+      await logToolCall(env, name, args || {}, 0, apiKey);
       return jsonrpc(id, result);
     }
 
