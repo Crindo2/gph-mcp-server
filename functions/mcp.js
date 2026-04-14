@@ -232,7 +232,7 @@ async function logToolCall(env, toolName, args, resultsCount, apiKey) {
 
 // ── Request router ──
 
-async function handleMcpRequest(body, env, apiKey) {
+async function handleMcpRequest(body, env, apiKey, ctx) {
   const { jsonrpc: version, id, method, params } = body;
 
   if (version !== '2.0') return jsonrpcError(id, -32600, 'Invalid JSON-RPC version');
@@ -251,8 +251,8 @@ async function handleMcpRequest(body, env, apiKey) {
       const { name, arguments: args } = params || {};
       if (!name) return jsonrpcError(id, -32602, 'Missing tool name');
       const result = await callTool(name, args || {});
-      // Non-blocking log
-      logToolCall(env, name, args || {}, 0, apiKey).catch(() => {});
+      // Non-blocking log via waitUntil so it survives response
+      if (ctx) ctx.waitUntil(logToolCall(env, name, args || {}, 0, apiKey));
       return jsonrpc(id, result);
     }
 
@@ -292,7 +292,7 @@ export async function onRequestPost(context) {
     if (Array.isArray(body)) {
       const results = [];
       for (const req of body) {
-        const res = await handleMcpRequest(req, env, apiKey);
+        const res = await handleMcpRequest(req, env, apiKey, context);
         if (res) results.push(res);
       }
       return Response.json(results, {
@@ -301,7 +301,7 @@ export async function onRequestPost(context) {
     }
 
     // Single request
-    const result = await handleMcpRequest(body, env, apiKey);
+    const result = await handleMcpRequest(body, env, apiKey, context);
     if (!result) return new Response('', { status: 204 }); // notification, no response
 
     return Response.json(result, {
