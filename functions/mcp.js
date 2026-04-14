@@ -5,6 +5,8 @@
  */
 
 const API_BASE = 'https://www.getpracticehelp.com/api';
+const AT_BASE = 'appvHqDMSu6aCwNxA';
+const AT_LOG_TABLE = 'tblMcpApiLogs'; // Create this table in Airtable
 
 const SERVER_INFO = {
   protocolVersion: '2024-11-05',
@@ -192,9 +194,45 @@ function getPrompt(name, args) {
   return null;
 }
 
+// ── MCP call logging to Airtable (Tier 1e) ──
+
+function computeSignalScore(args) {
+  let score = 0;
+  if (args.category) score = 1;
+  if (args.category && args.state) score = 2;
+  if (args.category && args.state && (args.city || args.specialty)) score = 3;
+  return score;
+}
+
+async function logToolCall(env, toolName, args, resultsCount, apiKey) {
+  const atKey = env.AIRTABLE_PAT;
+  if (!atKey) return;
+  try {
+    await fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_LOG_TABLE}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${atKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        records: [{ fields: {
+          'Tool Name': toolName,
+          'Category': args.category || '',
+          'Specialty': args.specialty || '',
+          'City': args.city || '',
+          'State': args.state || '',
+          'EHR System': args.ehr_system || '',
+          'Results Count': resultsCount || 0,
+          'Signal Score': computeSignalScore(args),
+          'Timestamp': new Date().toISOString(),
+          'API Key': apiKey ? '...' + apiKey.slice(-4) : 'anonymous'
+        }}],
+        typecast: true
+      })
+    });
+  } catch (e) { /* non-blocking */ }
+}
+
 // ── Request router ──
 
-async function handleMcpRequest(body) {
+async function handleMcpRequest(body, env, apiKey) {
   const { jsonrpc: version, id, method, params } = body;
 
   if (version !== '2.0') return jsonrpcError(id, -32600, 'Invalid JSON-RPC version');
@@ -213,6 +251,8 @@ async function handleMcpRequest(body) {
       const { name, arguments: args } = params || {};
       if (!name) return jsonrpcError(id, -32602, 'Missing tool name');
       const result = await callTool(name, args || {});
+      // Non-blocking log
+      logToolCall(env, name, args || {}, 0, apiKey).catch(() => {});
       return jsonrpc(id, result);
     }
 
@@ -242,7 +282,8 @@ async function handleMcpRequest(body) {
 // ── HTTP handler ──
 
 export async function onRequestPost(context) {
-  const { request } = context;
+  const { request, env } = context;
+  const apiKey = request.headers.get('x-api-key') || '';
 
   try {
     const body = await request.json();
@@ -251,7 +292,7 @@ export async function onRequestPost(context) {
     if (Array.isArray(body)) {
       const results = [];
       for (const req of body) {
-        const res = await handleMcpRequest(req);
+        const res = await handleMcpRequest(req, env, apiKey);
         if (res) results.push(res);
       }
       return Response.json(results, {
@@ -260,7 +301,7 @@ export async function onRequestPost(context) {
     }
 
     // Single request
-    const result = await handleMcpRequest(body);
+    const result = await handleMcpRequest(body, env, apiKey);
     if (!result) return new Response('', { status: 204 }); // notification, no response
 
     return Response.json(result, {
