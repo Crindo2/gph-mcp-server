@@ -1,0 +1,8 @@
+name = "gph-mcp-server"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "."
+
+[[d1_databases]]
+binding = "DB"
+database_name = "gph-providers"
+database_id = "7a06fa73-938d-4ad7-8855-87f6806692ca"

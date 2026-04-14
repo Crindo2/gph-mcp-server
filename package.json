@@ -1,0 +1,6 @@
+{
+  "name": "gph-mcp-server",
+  "version": "1.0.0",
+  "description": "GPH Intelligence MCP Server — Healthcare Service Provider Finder",
+  "main": "index.js"
+}
