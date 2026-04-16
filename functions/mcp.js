@@ -194,26 +194,42 @@ function getPrompt(name, args) {
   return null;
 }
 
-// ── KV Metering (Tier 2a) ──
+// ── KV Metering — IP abuse layer + anonymous lifetime tier ──
 
-const FREE_LIMIT = 25;
+const FREE_LIMIT = 25;        // anonymous lifetime per IP
+const ABUSE_LIMIT = 10;       // per hour per IP (applies to keyed + anonymous)
 
-async function checkAndMeterCall(env, apiKey) {
+async function checkAndMeterCall(env, apiKey, request) {
   const kv = env?.CALL_METER;
   if (!kv) return { allowed: true, callCount: 0 }; // KV not bound, allow
 
-  const key = apiKey || 'anonymous';
-  const monthKey = `${key}:${new Date().toISOString().slice(0, 7)}`;
-  const current = parseInt(await kv.get(monthKey) || '0');
+  const ip = request.headers.get('cf-connecting-ip') || 'unknown';
 
-  // Free tier: 25 calls/month
-  if (!apiKey && current >= FREE_LIMIT) {
-    return { allowed: false, callCount: current, reason: 'Free tier limit reached (25 calls/month). Get API access at https://www.getpracticehelp.com/api-access/' };
+  // Layer 1: IP abuse detection (10/hr per IP) — applies to BOTH keyed and anonymous
+  const abuseKey = `ip_abuse:${ip}`;
+  const abuseCount = parseInt(await kv.get(abuseKey) || '0');
+  if (abuseCount >= ABUSE_LIMIT) {
+    return {
+      allowed: false,
+      reason: 'Rate limit exceeded. Please register for an API key at https://www.getpracticehelp.com/api-access/'
+    };
   }
+  await kv.put(abuseKey, String(abuseCount + 1), { expirationTtl: 3600 });
 
-  // TODO: Tier 2c — validate paid API keys against Airtable for higher limits
+  // Keyed users bypass the lifetime tier (existing API key infrastructure handles them)
+  if (apiKey) return { allowed: true, callCount: 0 };
 
-  await kv.put(monthKey, String(current + 1), { expirationTtl: 60 * 60 * 24 * 45 });
+  // Layer 2: Anonymous lifetime tier (25 per IP, no TTL)
+  const permKey = `anon:perm:${ip}`;
+  const current = parseInt(await kv.get(permKey) || '0');
+  if (current >= FREE_LIMIT) {
+    return {
+      allowed: false,
+      callCount: current,
+      reason: "You've used your 25 free queries. Register at https://www.getpracticehelp.com/api-access/ with your email to get a free API key — no credit card required. Paid plans from $149/mo for unlimited access."
+    };
+  }
+  await kv.put(permKey, String(current + 1)); // no TTL = permanent per-IP lifetime counter
   return { allowed: true, callCount: current + 1 };
 }
 
@@ -275,7 +291,7 @@ async function handleMcpRequest(body, env, apiKey, ctx) {
       if (!name) return jsonrpcError(id, -32602, 'Missing tool name');
 
       // Check rate limit
-      const meter = await checkAndMeterCall(env, apiKey);
+      const meter = await checkAndMeterCall(env, apiKey, ctx.request);
       if (!meter.allowed) {
         return jsonrpc(id, { content: [{ type: 'text', text: meter.reason }], isError: true });
       }
