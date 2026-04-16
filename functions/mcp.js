@@ -55,7 +55,7 @@ const TOOLS = [
   {
     name: 'get_provider_detail',
     title: 'Get Provider Detail',
-    description: "Get the full profile of one healthcare service provider identified by slug: full description, services offered, contact information (phone, email, website), quality_score (0-100), verified status, and user reviews. Slug comes from match_practice or search_providers results. Returns an error if the slug is unknown.",
+    description: "Get the full profile of one healthcare service provider identified by slug: company_name, category (plus super_category grouping), description, services_tags (comma-delimited list of services offered), website, phone, city/state, quality_score (0-100), verified status, listing tier (free/paid), practice_size_fit, and reviews with review_count and average_rating. Slug comes from match_practice or search_providers results. Returns an error if the slug is unknown.",
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     inputSchema: {
       type: 'object',
