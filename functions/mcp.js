@@ -197,43 +197,110 @@ function getPrompt(name, args) {
   return null;
 }
 
-// ── KV Metering — IP abuse layer + anonymous lifetime tier ──
+// ── Access control (Apr 2026): API key required for tools/call. Anonymous tier removed. ──
 
-const FREE_LIMIT = 25;        // anonymous lifetime per IP
-const ABUSE_LIMIT = 10;       // per hour per IP (applies to keyed + anonymous)
+const ABUSE_LIMIT = 10;  // per hour per IP (keyed users only)
+const PRICING_URL = 'https://www.getpracticehelp.com/api-access/';
 
-async function checkAndMeterCall(env, apiKey, request) {
-  const kv = env?.CALL_METER;
-  if (!kv) return { allowed: true, callCount: 0 }; // KV not bound, allow
+const PLAN_LIMITS = {
+  developer:  { limit: 5000,     hardCap: true,  reportUsage: false, meterEvent: null },
+  growth:     { limit: 25000,    hardCap: true,  reportUsage: false, meterEvent: null },
+  scale:      { limit: 100000,   hardCap: true,  reportUsage: false, meterEvent: null },
+  enterprise: { limit: Infinity, hardCap: false, reportUsage: false, meterEvent: null },
+  payg:       { limit: Infinity, hardCap: false, reportUsage: true,  meterEvent: 'gph_api_call' },
+};
 
-  const ip = request.headers.get('cf-connecting-ip') || 'unknown';
-
-  // Layer 1: IP abuse detection (10/hr per IP) — applies to BOTH keyed and anonymous
-  const abuseKey = `ip_abuse:${ip}`;
-  const abuseCount = parseInt(await kv.get(abuseKey) || '0');
-  if (abuseCount >= ABUSE_LIMIT) {
+async function validateKey(env, apiKey, request) {
+  if (!apiKey) {
     return {
       allowed: false,
-      reason: 'Rate limit exceeded. Please register for an API key at https://www.getpracticehelp.com/api-access/'
+      reason: `GPH Intelligence requires an API key. 103,000+ verified healthcare service providers with enriched firmographics (employee counts, revenue estimates, LinkedIn URLs, quality scores). Subscribe from $149/mo or pay-per-query at $0.50/call at ${PRICING_URL}`
     };
   }
-  await kv.put(abuseKey, String(abuseCount + 1), { expirationTtl: 3600 });
 
-  // Keyed users bypass the lifetime tier (existing API key infrastructure handles them)
-  if (apiKey) return { allowed: true, callCount: 0 };
+  const kv = env?.GPH_API_KEYS;
+  if (!kv) return { allowed: false, reason: 'Server misconfiguration. Please try again later.' };
 
-  // Layer 2: Anonymous lifetime tier (25 per IP, no TTL)
-  const permKey = `anon:perm:${ip}`;
-  const current = parseInt(await kv.get(permKey) || '0');
-  if (current >= FREE_LIMIT) {
+  const raw = await kv.get(apiKey);
+  if (!raw) {
     return {
       allowed: false,
-      callCount: current,
-      reason: "You've used your 25 free queries. Register at https://www.getpracticehelp.com/api-access/ with your email to get a free API key — no credit card required. Paid plans from $149/mo for unlimited access."
+      reason: `Invalid API key. If you recently subscribed, check your welcome email for the correct key. Otherwise subscribe at ${PRICING_URL}`
     };
   }
-  await kv.put(permKey, String(current + 1)); // no TTL = permanent per-IP lifetime counter
-  return { allowed: true, callCount: current + 1 };
+
+  const record = JSON.parse(raw);
+  if (record.status === 'canceled') {
+    return { allowed: false, reason: `This API key has been canceled. Resubscribe at ${PRICING_URL}` };
+  }
+
+  const abuseKv = env?.CALL_METER;
+  if (abuseKv) {
+    const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+    const abuseKey = `ip_abuse:${ip}`;
+    const abuseCount = parseInt(await abuseKv.get(abuseKey) || '0', 10);
+    if (abuseCount >= ABUSE_LIMIT) {
+      return { allowed: false, reason: 'Rate limit exceeded (10 req/hr per IP). If unexpected, reply to your welcome email.' };
+    }
+    await abuseKv.put(abuseKey, String(abuseCount + 1), { expirationTtl: 3600 });
+  }
+
+  const planSpec = PLAN_LIMITS[record.plan];
+  if (!planSpec) return { allowed: false, reason: 'Unknown plan on this API key. Reply to your welcome email.' };
+
+  if (planSpec.hardCap && record.callsThisPeriod >= planSpec.limit) {
+    return {
+      allowed: false,
+      reason: `Monthly quota reached (${planSpec.limit.toLocaleString()} calls on the ${record.plan} plan). Upgrade at ${PRICING_URL} or wait until ${record.periodEnd} for the next cycle.`
+    };
+  }
+
+  return { allowed: true, record, apiKey, planSpec };
+}
+
+async function recordSuccessfulCall(env, validation) {
+  if (!validation.record) return;
+  const updated = {
+    ...validation.record,
+    callsThisPeriod: (validation.record.callsThisPeriod || 0) + 1,
+    lastUsedAt: new Date().toISOString(),
+  };
+  await env.GPH_API_KEYS.put(validation.apiKey, JSON.stringify(updated));
+
+  if (validation.planSpec.reportUsage && validation.planSpec.meterEvent) {
+    await postMeterEvent(env, validation.planSpec.meterEvent, validation.record.customerId);
+  }
+}
+
+async function postMeterEvent(env, eventName, customerId) {
+  const stripeKey = env?.STRIPE_SECRET_KEY;
+  if (!stripeKey || !customerId) return;
+  const identifier = `${eventName}-${customerId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const body = new URLSearchParams({
+    event_name: eventName,
+    'payload[stripe_customer_id]': customerId,
+    'payload[value]': '1',
+    identifier,
+  });
+  try {
+    const res = await fetch('https://api.stripe.com/v1/billing/meter_events', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stripeKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Idempotency-Key': identifier,
+      },
+      body,
+    });
+    if (!res.ok) throw new Error(`meter event ${res.status}`);
+  } catch (e) {
+    // Queue for later retry. Drained by cbeg-usage-reporter Worker (Phase 3.6).
+    await env.GPH_API_KEYS.put(
+      `usage_retry:${Date.now()}:${identifier}`,
+      JSON.stringify({ eventName, customerId, identifier, timestamp: Date.now() }),
+      { expirationTtl: 86400 * 7 }
+    ).catch(() => {});
+  }
 }
 
 // ── MCP call logging to Airtable (Tier 1e) ──
@@ -293,14 +360,20 @@ async function handleMcpRequest(body, env, apiKey, ctx) {
       const { name, arguments: args } = params || {};
       if (!name) return jsonrpcError(id, -32602, 'Missing tool name');
 
-      // Check rate limit
-      const meter = await checkAndMeterCall(env, apiKey, ctx.request);
-      if (!meter.allowed) {
-        return jsonrpc(id, { content: [{ type: 'text', text: meter.reason }], isError: true });
+      const validation = await validateKey(env, apiKey, ctx.request);
+      if (!validation.allowed) {
+        return jsonrpc(id, { content: [{ type: 'text', text: validation.reason }], isError: true });
       }
 
       const result = await callTool(name, args || {});
       await logToolCall(env, name, args || {}, 0, apiKey);
+
+      if (!result.isError) {
+        const recording = recordSuccessfulCall(env, validation).catch(e => console.error('record failed:', e));
+        if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(recording);
+        else await recording;
+      }
+
       return jsonrpc(id, result);
     }
 
