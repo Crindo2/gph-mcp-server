@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.Crindo2/gph-mcp-server",
-  "title": "GPH Intelligence — Healthcare Service Provider Finder",
-  "description": "Find healthcare service providers for medical practices. 100,000+ verified vendors.",
-  "version": "1.0.0",
+  "title": "GPH Intelligence — Healthcare Service Provider Finder (API key required)",
+  "description": "Paid MCP for 103,000+ verified healthcare service providers with enriched firmographics (Apollo employee counts, revenue estimates, LinkedIn URLs, quality scores). Requires API key — subscription from $149/mo or $0.50/call PAYG. Get started at https://www.getpracticehelp.com/api-access/. Tools: match_practice, search_providers, get_provider_detail.",
+  "version": "1.1.0",
   "repository": {
     "url": "https://github.com/Crindo2/gph-mcp-server",
     "source": "github"
