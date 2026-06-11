@@ -145,7 +145,8 @@ async function callTool(name, args) {
           p.website ? `   Website: ${p.website}` : '',
         ].filter(Boolean).join('\n')).join('\n\n');
 
-    return { content: [{ type: 'text', text: `${data.total || providers.length} total results (page ${args.page || 1}):\n\n${text}` }] };
+    const totalResults = data.pagination?.total ?? data.total ?? providers.length;
+    return { content: [{ type: 'text', text: `${totalResults} total results (page ${args.page || 1}):\n\n${text}` }] };
   }
 
   if (name === 'get_provider_detail') {
