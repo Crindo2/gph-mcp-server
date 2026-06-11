@@ -46,7 +46,9 @@ const TOOLS = [
         state: { type: 'string', description: "Two-letter state abbreviation (e.g. 'TX'). National providers always included." },
         city: { type: 'string', description: 'City name to filter by (partial match supported)' },
         min_rating: { type: 'number', description: 'Minimum quality score (0-100). Most providers score 50-85.', minimum: 0, maximum: 100 },
-        per_page: { type: 'number', description: 'Results per page (1-50, default 10)', minimum: 1, maximum: 50, default: 10 },
+        tier1_grade: { type: 'string', enum: ['A', 'B'], description: "Filter to the curated Tier-1 provider set by grade: 'A' (top-graded) or 'B' (strong). Tier-1 is a hand-reviewed ~4,400-provider subset; most directory records are not Tier-1, so this narrows results sharply. Omit to search the full directory." },
+        practice_size_fit: { type: 'string', enum: ['Solo/Small', 'Mid-size', 'Large', 'All'], description: 'Filter providers by the practice size they best serve.' },
+        per_page: { type: 'number', description: 'Results per page (1-25, default 10)', minimum: 1, maximum: 25, default: 10 },
         page: { type: 'number', description: 'Page number for pagination (default 1)', minimum: 1, default: 1 },
       },
       required: ['category'],
@@ -123,7 +125,9 @@ async function callTool(name, args) {
     if (args.state) params.set('state', args.state);
     if (args.city) params.set('city', args.city);
     if (args.min_rating) params.set('min_rating', args.min_rating);
-    params.set('per_page', Math.min(args.per_page || 10, 50));
+    if (args.tier1_grade) params.set('tier1_grade', args.tier1_grade);
+    if (args.practice_size_fit) params.set('practice_size_fit', args.practice_size_fit);
+    params.set('per_page', Math.min(args.per_page || 10, ROW_CEILING));
     params.set('page', args.page || 1);
 
     const res = await fetch(`${API_BASE}/search?${params}`);
@@ -197,11 +201,15 @@ function getPrompt(name, args) {
   return null;
 }
 
-// ── Access control (Apr 2026): API key required for tools/call. Anonymous tier removed. ──
+// ── Access control (2026-06-10): free distribution. Anonymous tools/call ENABLED; paid tiers
+//    retired. Rate cap 100 calls/IP/day (rolling daily). Per-call row ceiling 25. Legacy keys
+//    honored but not required. Bulk/unmetered -> /data-licensing/. (Supersedes Apr-2026 key-only posture.) ──
 
-const ABUSE_LIMIT = 10;  // per hour per IP (keyed users only)
-const PRICING_URL = 'https://www.getpracticehelp.com/api-access/';
+const DAILY_LIMIT = 100;   // free-tier calls per IP per UTC day (rolling daily — no lifetime accumulation)
+const ROW_CEILING = 25;    // max rows returned per call; bulk/unmetered access -> data licensing
+const LICENSING_URL = 'https://www.getpracticehelp.com/data-licensing/';
 
+// Legacy plan limits retained so any pre-existing keyed caller keeps working. Keys are NOT required.
 const PLAN_LIMITS = {
   developer:  { limit: 5000,     hardCap: true,  reportUsage: false, meterEvent: null },
   growth:     { limit: 25000,    hardCap: true,  reportUsage: false, meterEvent: null },
@@ -210,52 +218,40 @@ const PLAN_LIMITS = {
   payg:       { limit: Infinity, hardCap: false, reportUsage: true,  meterEvent: 'gph_api_call' },
 };
 
-async function validateKey(env, apiKey, request) {
-  if (!apiKey) {
-    return {
-      allowed: false,
-      reason: `GPH Intelligence requires an API key. 103,000+ verified healthcare service providers with enriched firmographics (employee counts, revenue estimates, LinkedIn URLs, quality scores). Subscribe from $149/mo or pay-per-query at $0.50/call at ${PRICING_URL}`
-    };
-  }
+function utcDay() { return new Date().toISOString().slice(0, 10); }
 
-  const kv = env?.GPH_API_KEYS;
-  if (!kv) return { allowed: false, reason: 'Server misconfiguration. Please try again later.' };
-
-  const raw = await kv.get(apiKey);
-  if (!raw) {
-    return {
-      allowed: false,
-      reason: `Invalid API key. If you recently subscribed, check your welcome email for the correct key. Otherwise subscribe at ${PRICING_URL}`
-    };
-  }
-
-  const record = JSON.parse(raw);
-  if (record.status === 'canceled') {
-    return { allowed: false, reason: `This API key has been canceled. Resubscribe at ${PRICING_URL}` };
-  }
-
-  const abuseKv = env?.CALL_METER;
-  if (abuseKv) {
-    const ip = request.headers.get('cf-connecting-ip') || 'unknown';
-    const abuseKey = `ip_abuse:${ip}`;
-    const abuseCount = parseInt(await abuseKv.get(abuseKey) || '0', 10);
-    if (abuseCount >= ABUSE_LIMIT) {
-      return { allowed: false, reason: 'Rate limit exceeded (10 req/hr per IP). If unexpected, reply to your welcome email.' };
+async function checkAccess(env, apiKey, request) {
+  // Legacy keyed access (optional): a recognized, non-canceled key bypasses the anonymous daily cap.
+  if (apiKey) {
+    const kv = env?.GPH_API_KEYS;
+    if (kv) {
+      const raw = await kv.get(apiKey);
+      if (raw) {
+        const record = JSON.parse(raw);
+        const planSpec = PLAN_LIMITS[record.plan];
+        if (record.status !== 'canceled' && planSpec) {
+          if (planSpec.hardCap && record.callsThisPeriod >= planSpec.limit) {
+            return { allowed: false, reason: `Monthly quota reached (${planSpec.limit.toLocaleString()} calls on the ${record.plan} plan). For bulk or unmetered access, license the dataset at ${LICENSING_URL}` };
+          }
+          return { allowed: true, record, apiKey, planSpec };
+        }
+      }
     }
-    await abuseKv.put(abuseKey, String(abuseCount + 1), { expirationTtl: 3600 });
+    // Unrecognized or canceled key: fall through to the free anonymous tier (never hard-block).
   }
 
-  const planSpec = PLAN_LIMITS[record.plan];
-  if (!planSpec) return { allowed: false, reason: 'Unknown plan on this API key. Reply to your welcome email.' };
-
-  if (planSpec.hardCap && record.callsThisPeriod >= planSpec.limit) {
-    return {
-      allowed: false,
-      reason: `Monthly quota reached (${planSpec.limit.toLocaleString()} calls on the ${record.plan} plan). Upgrade at ${PRICING_URL} or wait until ${record.periodEnd} for the next cycle.`
-    };
+  // Free anonymous tier — 100 calls/IP/day (UTC), rolling daily, no lifetime cap.
+  const meter = env?.CALL_METER;
+  if (meter) {
+    const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+    const dayKey = `ip_daily:${ip}:${utcDay()}`;
+    const count = parseInt(await meter.get(dayKey) || '0', 10);
+    if (count >= DAILY_LIMIT) {
+      return { allowed: false, reason: `Free tier limit reached (${DAILY_LIMIT} calls/IP/day; resets 00:00 UTC). For bulk or unmetered access, license the dataset at ${LICENSING_URL}` };
+    }
+    await meter.put(dayKey, String(count + 1), { expirationTtl: 172800 });
   }
-
-  return { allowed: true, record, apiKey, planSpec };
+  return { allowed: true, anonymous: true };
 }
 
 async function recordSuccessfulCall(env, validation) {
@@ -360,7 +356,7 @@ async function handleMcpRequest(body, env, apiKey, ctx) {
       const { name, arguments: args } = params || {};
       if (!name) return jsonrpcError(id, -32602, 'Missing tool name');
 
-      const validation = await validateKey(env, apiKey, ctx.request);
+      const validation = await checkAccess(env, apiKey, ctx.request);
       if (!validation.allowed) {
         return jsonrpc(id, { content: [{ type: 'text', text: validation.reason }], isError: true });
       }
