@@ -116,7 +116,7 @@ async function callTool(name, args) {
           `   Profile: https://www.getpracticehelp.com/providers/${m.slug}/`,
         ].filter(Boolean).join('\n')).join('\n\n');
 
-    return { content: [{ type: 'text', text: `Found ${data.total || matches.length} providers. Top ${matches.length} matches:\n\n${text}` }] };
+    return { content: [{ type: 'text', text: `Found ${data.total || matches.length} providers. Top ${matches.length} matches:\n\n${text}` }], count: data.total ?? matches.length };
   }
 
   if (name === 'search_providers') {
@@ -146,7 +146,7 @@ async function callTool(name, args) {
         ].filter(Boolean).join('\n')).join('\n\n');
 
     const totalResults = data.pagination?.total ?? data.total ?? providers.length;
-    return { content: [{ type: 'text', text: `${totalResults} total results (page ${args.page || 1}):\n\n${text}` }] };
+    return { content: [{ type: 'text', text: `${totalResults} total results (page ${args.page || 1}):\n\n${text}` }], count: totalResults };
   }
 
   if (name === 'get_provider_detail') {
@@ -175,7 +175,7 @@ async function callTool(name, args) {
       `**Profile:** https://www.getpracticehelp.com/providers/${p.slug}/`,
     ].filter(Boolean).join('\n');
 
-    return { content: [{ type: 'text', text }] };
+    return { content: [{ type: 'text', text }], count: 1 };
   }
 
   return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true };
@@ -363,7 +363,7 @@ async function handleMcpRequest(body, env, apiKey, ctx) {
       }
 
       const result = await callTool(name, args || {});
-      await logToolCall(env, name, args || {}, 0, apiKey);
+      await logToolCall(env, name, args || {}, result.count || 0, apiKey);
 
       if (!result.isError) {
         const recording = recordSuccessfulCall(env, validation).catch(e => console.error('record failed:', e));
