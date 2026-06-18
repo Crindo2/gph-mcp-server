@@ -397,10 +397,31 @@ async function handleMcpRequest(body, env, apiKey, ctx) {
   }
 }
 
+// ── Origin validation (MCP Streamable HTTP security requirement) ──
+// Per the MCP spec, servers MUST validate the Origin header on all incoming connections
+// to prevent DNS rebinding attacks. Non-browser MCP clients (Claude Desktop, mcp-remote,
+// server-to-server) send no Origin and are allowed; browser requests must come from an
+// allowed host.
+const ALLOWED_ORIGIN_HOSTS = ['gph-mcp-server.pages.dev', 'claude.ai', 'claude.com', 'anthropic.com', 'localhost', '127.0.0.1'];
+
+function originAllowed(request) {
+  const origin = request.headers.get('Origin');
+  if (!origin) return true; // no Origin header = non-browser client; no DNS-rebinding vector
+  let hostname;
+  try { hostname = new URL(origin).hostname; } catch { return false; }
+  return ALLOWED_ORIGIN_HOSTS.some(h => hostname === h || hostname.endsWith('.' + h));
+}
+
 // ── HTTP handler ──
 
 export async function onRequestPost(context) {
   const { request, env } = context;
+  if (!originAllowed(request)) {
+    return Response.json(jsonrpcError(null, -32600, 'Origin not allowed'), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    });
+  }
   const apiKey = request.headers.get('x-api-key') || '';
 
   try {
@@ -434,13 +455,19 @@ export async function onRequestPost(context) {
 }
 
 // Handle OPTIONS for CORS
-export async function onRequestOptions() {
+export async function onRequestOptions(context) {
+  const { request } = context;
+  if (!originAllowed(request)) {
+    return new Response(null, { status: 403 });
+  }
+  const origin = request.headers.get('Origin');
   return new Response(null, {
     headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
+      'Access-Control-Allow-Origin': origin || '*',
+      'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, x-api-key, Mcp-Session-Id, MCP-Protocol-Version',
       'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin',
     },
   });
 }
