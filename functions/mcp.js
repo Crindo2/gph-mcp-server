@@ -10,7 +10,7 @@ const AT_LOG_TABLE = 'tbl5ae8t1PbK2AMkx';
 
 const SERVER_INFO = {
   protocolVersion: '2024-11-05',
-  serverInfo: { name: 'gph-intelligence', version: '1.0.0' },
+  serverInfo: { name: 'gph-intelligence', version: '1.1.1' },
   capabilities: { tools: {}, prompts: {}, resources: {} },
 };
 
@@ -449,7 +449,7 @@ export async function onRequestOptions() {
 export async function onRequestGet() {
   return Response.json({
     name: 'gph-intelligence',
-    version: '1.0.0',
+    version: '1.1.1',
     description: 'GPH Intelligence MCP Server — Find healthcare service providers for medical practices.',
     mcp_endpoint: 'POST /mcp',
     documentation: 'https://www.getpracticehelp.com/providers/',

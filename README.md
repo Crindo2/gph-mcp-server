@@ -97,6 +97,7 @@ For bulk or unmetered access, license the dataset at [getpracticehelp.com/data-l
 - **Homepage:** [getpracticehelp.com](https://www.getpracticehelp.com)
 - **Provider Directory:** [getpracticehelp.com/providers/](https://www.getpracticehelp.com/providers/)
 - **Smithery:** [smithery.ai/server/cbeggroup/getpracticehelp](https://smithery.ai/server/cbeggroup/getpracticehelp)
+- **Privacy:** [gph-mcp-server.pages.dev/privacy](https://gph-mcp-server.pages.dev/privacy)
 
 ## License
 
