@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <rect width="256" height="256" rx="48" fill="#2D7D6F"/>
+  <g transform="translate(128,90)" text-anchor="middle">
+    <text font-family="system-ui,-apple-system,sans-serif" font-weight="800" font-size="72" fill="#fff" dy=".35em">GPH</text>
+  </g>
+  <g transform="translate(128,170)" text-anchor="middle">
+    <text font-family="system-ui,-apple-system,sans-serif" font-weight="500" font-size="22" fill="rgba(255,255,255,0.8)" dy=".35em">INTELLIGENCE</text>
+  </g>
+  <!-- Stethoscope accent -->
+  <circle cx="198" cy="48" r="14" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="3"/>
+  <path d="M198 62 Q198 72 188 72 L178 72" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="3" stroke-linecap="round"/>
+</svg>
