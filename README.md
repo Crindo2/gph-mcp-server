@@ -1,41 +1,41 @@
-# GPH Intelligence — Healthcare Service Provider Finder
+# GPH Intelligence - Healthcare Vendor Finder
 
-An MCP server that gives AI agents access to 103,000+ verified healthcare service providers across the United States. Built for practice managers, healthcare AI developers, and anyone building tools for the medical practice market.
+An MCP server that gives AI agents access to 76,000+ curated healthcare service vendors across the United States. Built for practice managers, healthcare AI developers, and anyone building tools for the medical practice market.
 
 ## What It Does
 
-The GPH Intelligence MCP server provides structured access to GetPracticeHelp's database of healthcare service vendors — medical billing companies, credentialing services, EHR consultants, healthcare attorneys, compliance firms, and more — across 25 categories and all 50 states.
+The GPH Intelligence MCP server provides structured access to GetPracticeHelp's database of healthcare service vendors -- medical billing companies, credentialing services, EHR consultants, healthcare attorneys, compliance firms, and more -- across 25 categories and all 50 states.
 
 ## Tools
 
 ### `match_practice`
-Find the best healthcare service providers for a medical practice based on specialty, size, location, EHR system, and budget. Returns ranked matches with quality scores.
+Find the best healthcare service vendors for a medical practice based on specialty, size, location, EHR system, and budget. Returns ranked matches with quality scores.
 
 **Parameters:**
-- `category` (required) — Service category (e.g. "Medical Billing & RCM", "Credentialing Services")
-- `state` (required) — Two-letter state abbreviation (e.g. "TX", "CA")
-- `specialty` — Practice specialty (e.g. "Family Medicine", "Cardiology")
-- `practice_size` — "Solo", "Small", "Mid-size", or "Large"
-- `city` — City name
-- `ehr_system` — EHR system in use (e.g. "Epic", "athenahealth")
-- `budget_range` — Monthly budget range
+- `category` (required) -- Service category (e.g. "Medical Billing & RCM", "Credentialing Services")
+- `state` (required) -- Two-letter state abbreviation (e.g. "TX", "CA")
+- `specialty` -- Practice specialty (e.g. "Family Medicine", "Cardiology")
+- `practice_size` -- "Solo", "Small", "Mid-size", or "Large"
+- `city` -- City name
+- `ehr_system` -- EHR system in use (e.g. "Epic", "athenahealth")
+- `budget_range` -- Monthly budget range
 
 ### `search_providers`
-Search for healthcare service providers by category, location, and quality rating. Returns paginated results.
+Search the vendor directory by category, location, and quality rating. Returns paginated results.
 
 **Parameters:**
-- `category` (required) — Service category to search
-- `state` — Two-letter state abbreviation
-- `city` — City name filter
-- `min_rating` — Minimum quality score (0-100)
-- `per_page` — Results per page (default 10, max 50)
-- `page` — Page number
+- `category` (required) -- Service category to search
+- `state` -- Two-letter state abbreviation
+- `city` -- City name filter
+- `min_rating` -- Minimum quality score (0-100)
+- `per_page` -- Results per page (default 10, max 25)
+- `page` -- Page number
 
 ### `get_provider_detail`
-Get full profile for a specific provider including description, services, contact information, and quality score.
+Get the full profile for a specific vendor including description, services, contact information, and quality score.
 
 **Parameters:**
-- `slug` (required) — Provider slug identifier (e.g. "ams-solutions-inc-dallas-tx")
+- `slug` (required) -- Vendor slug identifier (e.g. "ams-solutions-inc-dallas-tx")
 
 ## Usage
 
@@ -51,20 +51,16 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "gph-intelligence": {
       "command": "npx",
-      "args": ["-y", "@smithery/cli@latest", "run", "cbeggroup/getpracticehelp", "--key", "YOUR_SMITHERY_KEY"]
+      "args": ["-y", "mcp-remote", "https://gph-mcp-server.pages.dev/mcp"]
     }
   }
 }
 ```
-
-### Connect via Smithery
-```bash
-smithery mcp add cbeggroup/getpracticehelp
-```
+No API key required.
 
 ## Data Coverage
 
-- **103,000+** verified healthcare service providers
+- **76,000+** curated healthcare service vendors
 - **25** service categories across 6 super-categories
 - **All 50 states** + DC
 - **Quality scores** based on Google ratings, review volume, and verification status
@@ -92,9 +88,9 @@ Pharmacy & Medication Management, Laboratory & Diagnostics
 
 ## API Access
 
-Free tier: 25 calls/month — no API key required.
+Free: 100 calls per IP per day, no API key required.
 
-Paid tiers available at [getpracticehelp.com/api-access/](https://www.getpracticehelp.com/api-access/)
+For bulk or unmetered access, license the dataset at [getpracticehelp.com/data-licensing/](https://www.getpracticehelp.com/data-licensing/)
 
 ## Links
 
