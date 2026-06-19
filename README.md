@@ -92,6 +92,17 @@ Free: 100 calls per IP per day, no API key required.
 
 For bulk or unmetered access, license the dataset at [getpracticehelp.com/data-licensing/](https://www.getpracticehelp.com/data-licensing/)
 
+## Troubleshooting
+
+- **No results returned** -- broaden your query. `category` is required, so make sure it is set; then try removing the `city`/`min_rating` filters or widening the `state` (national providers are always included).
+- **HTTP 429 (rate limited)** -- the free tier allows 100 calls per IP per day, resetting at 00:00 UTC. For higher volume, license the dataset (see API Access above).
+- **Can't connect** -- point your client at the remote endpoint, no API key required:
+  ```
+  npx -y mcp-remote https://gph-mcp-server.pages.dev/mcp
+  ```
+- **403 from a browser** -- the `/mcp` endpoint validates the `Origin` header to prevent DNS rebinding. Standard MCP clients (Claude Desktop, `mcp-remote`, server-to-server) send no `Origin` header and connect fine; only disallowed browser origins are blocked.
+- **Support** -- questions or higher-volume access requests: cbeggroup@gmail.com
+
 ## Links
 
 - **Homepage:** [getpracticehelp.com](https://www.getpracticehelp.com)
