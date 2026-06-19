@@ -402,7 +402,7 @@ async function handleMcpRequest(body, env, apiKey, ctx) {
 // to prevent DNS rebinding attacks. Non-browser MCP clients (Claude Desktop, mcp-remote,
 // server-to-server) send no Origin and are allowed; browser requests must come from an
 // allowed host.
-const ALLOWED_ORIGIN_HOSTS = ['gph-mcp-server.pages.dev', 'claude.ai', 'claude.com', 'anthropic.com', 'localhost', '127.0.0.1'];
+const ALLOWED_ORIGIN_HOSTS = ['gph-mcp-server.pages.dev', 'claude.ai', 'claude.com', 'anthropic.com', 'chatgpt.com', 'openai.com', 'localhost', '127.0.0.1'];
 
 function originAllowed(request) {
   const origin = request.headers.get('Origin');
