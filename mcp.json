@@ -1,7 +1,7 @@
 {
   "name": "gph-intelligence",
-  "version": "1.0.0",
-  "description": "Find healthcare service providers for medical practices. Access 100,000+ verified providers across billing, credentialing, IT, legal, compliance, and more.",
+  "version": "1.1.1",
+  "description": "Find healthcare service providers for medical practices. Access 76,000+ curated vendors across billing, credentialing, IT, legal, compliance, and more.",
   "homepage": "https://www.getpracticehelp.com/providers/",
   "iconUrl": "https://gph-mcp-server.pages.dev/icon.svg",
   "configSchema": {

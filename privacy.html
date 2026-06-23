@@ -22,7 +22,7 @@
   <p>This policy describes how the GPH Intelligence MCP Server (<code>https://gph-mcp-server.pages.dev/mcp</code>) handles data. It covers the MCP service's data handling, not the contents of the underlying vendor directory.</p>
 
   <h2>What we collect</h2>
-  <p>When you call a tool, we receive the query parameters you supply &mdash; service category, medical specialty, practice size, city, state, EHR system, budget range, and search filters &mdash; together with a derived "signal score" (0&ndash;3, reflecting how complete the query is), the number of results returned, and a timestamp. If you send a legacy API key, we record only its last four characters (otherwise the call is logged as "anonymous"). We receive your IP address from the network connection and use it solely for rate limiting.</p>
+  <p>When you call a tool, we receive the name of the tool you called and the query parameters you supply &mdash; service category, medical specialty, practice size, city, state, EHR system, budget range, and search filters &mdash; together with a derived "signal score" (0&ndash;3, reflecting how complete the query is), the number of results returned, and a timestamp. If you send a legacy API key, we record only its last four characters (otherwise the call is logged as "anonymous"). We receive your IP address from the network connection and use it solely for rate limiting.</p>
 
   <h2>How we use it</h2>
   <p>To operate the service and return results; to enforce rate limits (100 calls per IP per day); and to produce aggregate demand analytics that help us improve the directory and prioritize vendor coverage.</p>
