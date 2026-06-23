@@ -312,9 +312,9 @@ function computeSignalScore(args) {
 
 async function logToolCall(env, toolName, args, resultsCount, apiKey) {
   const atKey = env?.AIRTABLE_PAT;
-  if (!atKey) return;
+  if (!atKey) { console.error('logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped'); return; }
   try {
-    await fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_LOG_TABLE}`, {
+    const res = await fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_LOG_TABLE}`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${atKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -333,7 +333,17 @@ async function logToolCall(env, toolName, args, resultsCount, apiKey) {
         typecast: true
       })
     });
-  } catch (e) { /* non-blocking */ }
+    // Non-blocking, but NO LONGER silent: surface auth/schema failures so a dead
+    // write cannot go unseen again (the 2026-04-18 -> 2026-06-22 blind spot).
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      console.error(`logToolCall: Airtable telemetry write failed ${res.status} ${detail.slice(0, 200)}`);
+      await env?.CALL_METER?.put('telemetry_last_fail', new Date().toISOString(), { expirationTtl: 172800 }).catch(() => {});
+    }
+  } catch (e) {
+    console.error('logToolCall: Airtable telemetry write threw:', e && e.message);
+    await env?.CALL_METER?.put('telemetry_last_fail', new Date().toISOString(), { expirationTtl: 172800 }).catch(() => {});
+  }
 }
 
 // ── Request router ──
