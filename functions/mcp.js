@@ -19,7 +19,7 @@ const TOOLS = [
     name: 'match_practice',
     title: 'Match Practice to Providers',
     description: "Score and rank healthcare service providers for a specific medical practice profile (specialty, size, location, EHR system, budget). Returns up to 5 ranked matches with {company_name, category, city, state_abbr, quality_score (0-100), final_score (0-100), verified status, description, website, profile_url, slug}. Use this when the user has practice-specific criteria and wants scored recommendations — for open-ended browsing, use search_providers instead. Pass a match's slug to get_provider_detail for the full profile.",
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -38,7 +38,7 @@ const TOOLS = [
     name: 'search_providers',
     title: 'Search Provider Directory',
     description: 'Paginated browse of the healthcare service provider directory filtered by category, location, and minimum quality score. Returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100), verified status, contact info, slug}. Use this for open-ended exploration and filtering — for scored recommendations to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.',
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
       properties: {
@@ -58,7 +58,7 @@ const TOOLS = [
     name: 'get_provider_detail',
     title: 'Get Provider Detail',
     description: "Get the full profile of one healthcare service provider identified by slug: company_name, category (plus super_category grouping), description, services_tags (comma-delimited list of services offered), website, phone, city/state, quality_score (0-100), verified status, listing tier (free/paid), practice_size_fit, and reviews with review_count and average_rating. Slug comes from match_practice or search_providers results. Returns an error if the slug is unknown.",
-    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
       properties: {
