@@ -7,6 +7,11 @@ binding = "DB"
 database_name = "gph-providers"
 database_id = "7a06fa73-938d-4ad7-8855-87f6806692ca"
 
+[[d1_databases]]
+binding = "TELEMETRY_DB"
+database_name = "gph-mcp-telemetry"
+database_id = "e8605bbb-288e-4f45-b2fd-3a5333f21047"
+
 [[kv_namespaces]]
 binding = "CALL_METER"
 id = "b6bc61397cab4189ae25eb4396e8d5de"

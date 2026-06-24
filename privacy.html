@@ -17,27 +17,27 @@
 </head>
 <body>
   <h1>Privacy Policy</h1>
-  <p class="meta"><strong>GPH Intelligence MCP Server</strong> &middot; Last updated: 2026-06-18 &middot; Operated by CBEG Group LLC &middot; Contact: <a href="mailto:cbeggroup@gmail.com">cbeggroup@gmail.com</a></p>
+  <p class="meta"><strong>GPH Intelligence MCP Server</strong> &middot; Last updated: 2026-06-24 &middot; Operated by CBEG Group LLC &middot; Contact: <a href="mailto:cbeggroup@gmail.com">cbeggroup@gmail.com</a></p>
 
   <p>This policy describes how the GPH Intelligence MCP Server (<code>https://gph-mcp-server.pages.dev/mcp</code>) handles data. It covers the MCP service's data handling, not the contents of the underlying vendor directory.</p>
 
   <h2>What we collect</h2>
-  <p>When you call a tool, we receive the name of the tool you called and the query parameters you supply &mdash; service category, medical specialty, practice size, city, state, EHR system, budget range, and search filters &mdash; together with a derived "signal score" (0&ndash;3, reflecting how complete the query is), the number of results returned, and a timestamp. If you send a legacy API key, we record only its last four characters (otherwise the call is logged as "anonymous"). We receive your IP address from the network connection and use it solely for rate limiting.</p>
+  <p>When you call a tool, we receive the name of the tool you called and the query parameters you supply &mdash; service category, medical specialty, practice size, city, state, EHR system, budget range, and search filters &mdash; together with the identifiers of the providers returned and any provider profile you open, a derived "signal score" (0&ndash;3, reflecting how complete the query is), the number of results returned, and a timestamp. We also record the user-agent string of the calling software and, where your client supplies one, the MCP session identifier. If you send a legacy API key, we record only its access tier (otherwise the call is logged as "anonymous"). We receive your IP address from the network connection and use it only (a) for rate limiting and (b) as a transient input to a daily-rotating, non-reversible session-correlation value; your raw IP address is never written to either store.</p>
 
   <h2>How we use it</h2>
-  <p>To operate the service and return results; to enforce rate limits (100 calls per IP per day); and to produce aggregate demand analytics that help us improve the directory and prioritize vendor coverage.</p>
+  <p>To operate the service and return results; to enforce rate limits (100 calls per IP per day); and to produce aggregate demand analytics &mdash; which categories, specialties, and locations practices ask about, and how that demand arrives &mdash; that help us improve the directory and prioritize vendor coverage.</p>
 
   <h2>Storage and processors</h2>
-  <p>Query metadata is stored in Airtable (our data processor). Your IP address is stored only as a per-day rate-limit counter in Cloudflare KV and automatically expires after 48 hours; your IP is not written to Airtable.</p>
+  <p>Usage records are stored in Cloudflare D1 (our hosting provider's own database) and mirrored to Airtable (our data processor) for review. Each record holds the non-identifying call metadata described above &mdash; tool, query arguments, user-agent, and the derived session identifier &mdash; and does not contain your IP address or any account identity. Your IP address is held only as a per-day rate-limit counter in Cloudflare KV, which expires automatically after 48 hours.</p>
 
   <h2>Retention</h2>
-  <p>Query-metadata records are retained for service-improvement analytics for up to 24 months, after which they are deleted or aggregated. Rate-limit counters expire automatically after 48 hours.</p>
+  <p>Individual usage records are retained for service-improvement analytics in Cloudflare D1 and Airtable for up to 24 months, after which they are deleted; aggregate, de-identified demand statistics derived from them may be kept indefinitely. Rate-limit counters expire automatically after 48 hours.</p>
 
   <h2>Sharing</h2>
-  <p>We use Airtable as a processor and Cloudflare as our hosting and infrastructure provider. Aggregate, non-identifying demand insights may inform vendor and sponsor outreach. We do not sell personal data.</p>
+  <p>We use Cloudflare as our hosting and infrastructure provider (including the D1 database) and Airtable as a processor. We use aggregate, non-identifying demand insights to inform vendor and sponsor outreach. We do not sell or share the query or demand data.</p>
 
   <h2>What we do not collect</h2>
-  <p>No patient health information is requested or required &mdash; do not submit patient data through this service. There is no account registration and no cookies (the service is keyless).</p>
+  <p>No patient health information is requested or required &mdash; the tools accept only service category, specialty, location, and similar non-personal filters, so do not submit patient data through this service. We do not store your IP address as part of usage records, set cookies, or require account registration. The session identifier is an ephemeral, daily-rotating correlation value, not a persistent user ID.</p>
 
   <h2>Changes</h2>
   <p>We may update this policy; the current version is always at this URL.</p>
