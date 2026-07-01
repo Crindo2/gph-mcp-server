@@ -432,6 +432,8 @@ async function buildTelemetry(server, request, env, toolName, args, resultsCount
     assistant_channel: assistantChannel(ua, originHost),
     source: 'mcp',
     user_agent: ua,
+    referer: request.headers.get('referer') || null,
+    country: (request.cf && request.cf.country) || null,
     session_id: await deriveSessionId(request, env),
     funnel_step: step,
     zero_result: zero,
@@ -474,15 +476,16 @@ async function writeTelemetryD1(env, rec) {
         (ts, server, tool, caller_class, assistant_channel, source, user_agent, session_id, funnel_step,
          zero_result, results_count, api_key_tier, category, specialty, city, state, ehr_system,
          treatment_type, insurance, search_term, demand_cell, vendor_surfaced, vendor_drilled, raw_args,
-         practice_size, budget_range, practice_size_fit, field_completeness)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         practice_size, budget_range, practice_size_fit, field_completeness, country, referer)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).bind(
       rec.ts, rec.server, rec.tool, rec.caller_class, rec.assistant_channel, rec.source, rec.user_agent,
       rec.session_id, rec.funnel_step, rec.zero_result, rec.results_count, rec.api_key_tier,
       rec.category, rec.specialty, rec.city, rec.state, rec.ehr_system,
       rec.treatment_type, rec.insurance, rec.search_term, rec.demand_cell,
       rec.vendor_surfaced, rec.vendor_drilled, rec.raw_args,
-      rec.practice_size, rec.budget_range, rec.practice_size_fit, rec.field_completeness
+      rec.practice_size, rec.budget_range, rec.practice_size_fit, rec.field_completeness,
+      rec.country, rec.referer
     ).run();
   } catch (e) {
     console.error('writeTelemetryD1: D1 telemetry write threw:', e && e.message);
@@ -501,7 +504,7 @@ function computeSignalScore(rec) {
 
 // Independent, non-blocking Airtable sink. Own try/catch; never throws. Surfaces auth/
 // schema failures so a dead write cannot go unseen again (the 2026-04-18 blind spot).
-async function logToolCall(env, rec) {
+async function logToolCall(env, rec, request) {
   const atKey = env?.AIRTABLE_PAT;
   if (!atKey) { console.error('logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped'); return; }
   let surfacedCount = 0;
@@ -537,7 +540,9 @@ async function logToolCall(env, rec) {
           'Practice Size': rec.practice_size || '',
           'Budget Range': rec.budget_range || '',
           'Practice Size Fit': rec.practice_size_fit || '',
-          ...(typeof rec.field_completeness === 'number' ? { 'Field Completeness': rec.field_completeness } : {})
+          ...(typeof rec.field_completeness === 'number' ? { 'Field Completeness': rec.field_completeness } : {}),
+          'Country': (request && request.cf && request.cf.country) || '',
+          'Referer': (request && request.headers.get('referer')) || ''
         }}],
         typecast: true
       })
@@ -586,7 +591,7 @@ async function handleMcpRequest(body, env, apiKey, ctx) {
       // never skips the other, and neither blocks the tool response.
       const tier = validation.anonymous ? 'anonymous' : (validation.record?.plan || 'keyed');
       const rec = await buildTelemetry('gph', ctx.request, env, name, args || {}, result.count, tier, result.ids);
-      const telemetry = Promise.allSettled([logToolCall(env, rec), writeTelemetryD1(env, rec)]);
+      const telemetry = Promise.allSettled([logToolCall(env, rec, ctx.request), writeTelemetryD1(env, rec)]);
       if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(telemetry); else await telemetry;
 
       if (!result.isError) {
