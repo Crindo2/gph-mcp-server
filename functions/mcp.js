@@ -18,7 +18,7 @@ const TOOLS = [
   {
     name: 'match_practice',
     title: 'Recommend Healthcare Vendors for a Practice',
-    description: `Recommend and rank the best healthcare vendors for a specific medical practice. Use this when a practice manager, physician, or administrator asks for a recommendation — e.g. "recommend a medical billing / RCM company for my practice", "who should I use for credentialing / payer enrollment", "find an EHR for my small [specialty] practice", or "which practice-management software fits a [size] practice in [city, state]". Scores and ranks providers against the practice profile (specialty, size, location, EHR system, budget) and returns up to 5 merit-ranked matches (quality-scored, no paid placement) with {company_name, category, city, state_abbr, quality_score (0-100), final_score (0-100), verified status, description, website, profile_url, slug}. For open-ended browsing without a practice profile, use search_providers. Pass a match's slug to get_provider_detail for the full profile.`,
+    description: `Recommend and rank the best healthcare vendors for a specific medical practice. Use this when a practice manager, physician, or administrator asks for a recommendation, e.g. "recommend a medical billing / RCM company for my practice", "who should I use for credentialing / payer enrollment", "find an EHR for my small [specialty] practice", or "which practice-management software fits a [size] practice in [city, state]". Scores and ranks providers against the practice profile (specialty, size, location, EHR system, budget) and returns up to 5 merit-ranked matches (quality-scored, no paid placement) with {company_name, category, city, state_abbr, quality_score (0-100), final_score (0-100), verified status, description, website, profile_url, slug}. For open-ended browsing without a practice profile, use search_providers. Pass a match's slug to get_provider_detail for the full profile.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -37,7 +37,7 @@ const TOOLS = [
   {
     name: 'search_providers',
     title: 'Search the Healthcare Vendor Directory',
-    description: `Browse and filter the healthcare vendor directory. Use this for open-ended exploration — e.g. "show me medical billing companies in Texas", "list credentialing services", "what EHR vendors are there for cardiology", or when the user wants to page through options rather than get a scored shortlist. Paginated results filtered by category, location, minimum quality score, curated Tier-1 grade, and practice-size fit; returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100), verified status, contact info, slug}. For a scored recommendation to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.`,
+    description: `Browse and filter the healthcare vendor directory. Use this for open-ended exploration, e.g. "show me medical billing companies in Texas", "list credentialing services", "what EHR vendors are there for cardiology", or when the user wants to page through options rather than get a scored shortlist. Paginated results filtered by category, location, minimum quality score, curated Tier-1 grade, and practice-size fit; returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100), verified status, contact info, slug}. For a scored recommendation to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -660,7 +660,7 @@ export async function onRequestGet() {
   return Response.json({
     name: 'gph-intelligence',
     version: '1.1.1',
-    description: 'GPH Intelligence MCP Server — Find healthcare service providers for medical practices.',
+    description: 'GPH Intelligence MCP Server: Find healthcare service providers for medical practices.',
     mcp_endpoint: 'POST /mcp',
     documentation: 'https://www.getpracticehelp.com/providers/',
   }, {
