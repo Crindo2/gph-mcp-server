@@ -301,9 +301,13 @@ async function postMeterEvent(env, eventName, customerId) {
 }
 
 // ============================================================================
-// MCP demand-telemetry enrichment (D561, 2026-06-24) -- CANONICAL block, kept
-// IDENTICAL in gth-mcp-server/functions/[[path]].js and the scratch canonical copy
-// (_scratch/mcp-telemetry-2026-06-24/enrichment-canonical.js). Logic is KV-free and
+// MCP demand-telemetry enrichment (D561, 2026-06-24) -- shared enrichment core, originally
+// kept IDENTICAL in gth-mcp-server/functions/[[path]].js and the scratch canonical copy
+// (_scratch/mcp-telemetry-2026-06-24/enrichment-canonical.js). NOTE (2026-07-01): this GPH
+// copy now EXTENDS the core with practice-profile projections (practice_size, budget_range,
+// practice_size_fit) + computeFieldCompleteness -- so it has DIVERGED from the GTH copy.
+// The additions are server-generic (GTH branch in scoringArgsFor), so re-syncing GTH to this
+// is a clean parity follow-up, not a rewrite. Logic is KV-free and
 // network-free: caller_class is UA/Origin-only and deterministic at write time.
 // Cadence-based crawler detection lives in the nightly rollup ONLY, and may only
 // promote unknown -> known_crawler, never demote organic_assistant. The raw per-call
@@ -368,6 +372,30 @@ function demandCell(server, args) {
   return [n(args.category), n(args.specialty), n(args.state), n(args.ehr_system)].join('|');
 }
 
+// Scoring-relevant args per tool (the demand-specification surface, excluding pagination).
+// Reference/param-less tools return null (not a demand-spec call -> completeness N/A).
+function scoringArgsFor(server, tool) {
+  if (server === 'gth') {
+    if (tool === 'search_facilities') return ['state', 'city', 'treatment_type', 'insurance'];
+    if (tool === 'get_facility_detail') return ['name'];
+    return null;
+  }
+  if (tool === 'match_practice') return ['category', 'specialty', 'practice_size', 'city', 'state', 'ehr_system', 'budget_range'];
+  if (tool === 'search_providers') return ['category', 'state', 'city', 'min_rating', 'tier1_grade', 'practice_size_fit'];
+  if (tool === 'get_provider_detail') return ['slug'];
+  return null;
+}
+
+// 0-100 completeness of the scoring-relevant args actually supplied at call time. The real
+// quality signal (supersedes the coarse 0-3 Signal Score). null for reference/param-less tools.
+function computeFieldCompleteness(server, tool, args) {
+  const fields = scoringArgsFor(server, tool);
+  if (!fields || !fields.length) return null;
+  const a = args || {};
+  const present = fields.reduce((n, f) => n + ((a[f] != null && String(a[f]).trim() !== '') ? 1 : 0), 0);
+  return Math.round((present / fields.length) * 100);
+}
+
 function telemetryUtcDay() { return new Date().toISOString().slice(0, 10); }
 
 async function sha256hex(s) {
@@ -416,7 +444,19 @@ async function buildTelemetry(server, request, env, toolName, args, resultsCount
     ehr_system: a.ehr_system || null,
     treatment_type: a.treatment_type || null,
     insurance: a.insurance || null,
+    // search_term / query_text: INTENTIONALLY NOT CAPTURED on GPH (ruling 2026-07-01). No GPH
+    // tool accepts a free-text argument, so populating this would require a tool schema/contract
+    // change (OpenAI-reviewable) AND free-text healthcare input is the top PHI/re-identification
+    // risk. It is null for server='gph' BY DESIGN -- a null search_term on a gph row is NOT a
+    // capture gap. (GTH legitimately populates it from get_facility_detail's required `name`.)
+    // role: likewise structurally-null on the anonymous MCP surface (not an arg, not inferable).
     search_term: a.name || null,
+    // GPH practice-profile projections: first-class dimensions for args that previously landed
+    // only inside raw_args. Instrumentation only -- NO ranking/scoring effect (independence intact).
+    practice_size: a.practice_size || null,
+    budget_range: a.budget_range || null,
+    practice_size_fit: a.practice_size_fit || null,
+    field_completeness: computeFieldCompleteness(server, toolName, a),
     demand_cell: demandCell(server, a),
     vendor_surfaced: (ids && ids.surfaced && ids.surfaced.length) ? JSON.stringify(ids.surfaced) : null,
     vendor_drilled: (ids && ids.drilled) ? ids.drilled : null,
@@ -433,14 +473,16 @@ async function writeTelemetryD1(env, rec) {
       `INSERT INTO mcp_usage_log
         (ts, server, tool, caller_class, assistant_channel, source, user_agent, session_id, funnel_step,
          zero_result, results_count, api_key_tier, category, specialty, city, state, ehr_system,
-         treatment_type, insurance, search_term, demand_cell, vendor_surfaced, vendor_drilled, raw_args)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         treatment_type, insurance, search_term, demand_cell, vendor_surfaced, vendor_drilled, raw_args,
+         practice_size, budget_range, practice_size_fit, field_completeness)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).bind(
       rec.ts, rec.server, rec.tool, rec.caller_class, rec.assistant_channel, rec.source, rec.user_agent,
       rec.session_id, rec.funnel_step, rec.zero_result, rec.results_count, rec.api_key_tier,
       rec.category, rec.specialty, rec.city, rec.state, rec.ehr_system,
       rec.treatment_type, rec.insurance, rec.search_term, rec.demand_cell,
-      rec.vendor_surfaced, rec.vendor_drilled, rec.raw_args
+      rec.vendor_surfaced, rec.vendor_drilled, rec.raw_args,
+      rec.practice_size, rec.budget_range, rec.practice_size_fit, rec.field_completeness
     ).run();
   } catch (e) {
     console.error('writeTelemetryD1: D1 telemetry write threw:', e && e.message);
@@ -490,7 +532,12 @@ async function logToolCall(env, rec) {
           'Raw Args': rec.raw_args || '',
           'Demand Cell': rec.demand_cell || '',
           'Vendor Drilled': rec.vendor_drilled || '',
-          'Vendor Surfaced Count': surfacedCount
+          'Vendor Surfaced Count': surfacedCount,
+          'Vendors Surfaced': rec.vendor_surfaced || '',
+          'Practice Size': rec.practice_size || '',
+          'Budget Range': rec.budget_range || '',
+          'Practice Size Fit': rec.practice_size_fit || '',
+          ...(typeof rec.field_completeness === 'number' ? { 'Field Completeness': rec.field_completeness } : {})
         }}],
         typecast: true
       })
