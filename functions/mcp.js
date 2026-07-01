@@ -17,8 +17,8 @@ const SERVER_INFO = {
 const TOOLS = [
   {
     name: 'match_practice',
-    title: 'Match Practice to Providers',
-    description: "Score and rank healthcare service providers for a specific medical practice profile (specialty, size, location, EHR system, budget). Returns up to 5 ranked matches with {company_name, category, city, state_abbr, quality_score (0-100), final_score (0-100), verified status, description, website, profile_url, slug}. Use this when the user has practice-specific criteria and wants scored recommendations — for open-ended browsing, use search_providers instead. Pass a match's slug to get_provider_detail for the full profile.",
+    title: 'Recommend Healthcare Vendors for a Practice',
+    description: `Recommend and rank the best healthcare vendors for a specific medical practice. Use this when a practice manager, physician, or administrator asks for a recommendation — e.g. "recommend a medical billing / RCM company for my practice", "who should I use for credentialing / payer enrollment", "find an EHR for my small [specialty] practice", or "which practice-management software fits a [size] practice in [city, state]". Scores and ranks providers against the practice profile (specialty, size, location, EHR system, budget) and returns up to 5 merit-ranked matches (quality-scored, no paid placement) with {company_name, category, city, state_abbr, quality_score (0-100), final_score (0-100), verified status, description, website, profile_url, slug}. For open-ended browsing without a practice profile, use search_providers. Pass a match's slug to get_provider_detail for the full profile.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -36,8 +36,8 @@ const TOOLS = [
   },
   {
     name: 'search_providers',
-    title: 'Search Provider Directory',
-    description: 'Paginated browse of the healthcare service provider directory filtered by category, location, and minimum quality score. Returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100), verified status, contact info, slug}. Use this for open-ended exploration and filtering — for scored recommendations to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.',
+    title: 'Search the Healthcare Vendor Directory',
+    description: `Browse and filter the healthcare vendor directory. Use this for open-ended exploration — e.g. "show me medical billing companies in Texas", "list credentialing services", "what EHR vendors are there for cardiology", or when the user wants to page through options rather than get a scored shortlist. Paginated results filtered by category, location, minimum quality score, curated Tier-1 grade, and practice-size fit; returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100), verified status, contact info, slug}. For a scored recommendation to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -56,8 +56,8 @@ const TOOLS = [
   },
   {
     name: 'get_provider_detail',
-    title: 'Get Provider Detail',
-    description: "Get the full profile of one healthcare service provider identified by slug: company_name, category (plus super_category grouping), description, services_tags (comma-delimited list of services offered), website, phone, city/state, quality_score (0-100), verified status, listing tier (free/paid), practice_size_fit, and reviews with review_count and average_rating. Slug comes from match_practice or search_providers results. Returns an error if the slug is unknown.",
+    title: 'Get Vendor Profile Detail',
+    description: `Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to "tell me more about [vendor]", "what services does [vendor] offer", "is [vendor] verified", or wants contact info, services, reviews, or listing tier for a specific provider. Returns company_name, category (plus super_category grouping), description, services_tags (comma-delimited services offered), website, phone, city/state, quality_score (0-100), verified status, listing tier (free/paid), practice_size_fit, and reviews (review_count, average_rating). Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
