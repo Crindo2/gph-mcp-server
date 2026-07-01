@@ -138,7 +138,7 @@ async function callTool(name, args) {
     const text = providers.length === 0
       ? 'No providers found matching your criteria.'
       : providers.map((p, i) => [
-          `${i + 1}. **${p.company_name}** — ${p.city || 'National'}, ${p.state_abbr || 'US'}`,
+          `${i + 1}. **${p.company_name}**, ${p.city || 'National'}, ${p.state_abbr || 'US'}`,
           `   Quality: ${p.quality_score}/100${p.verified ? ' ✓ Verified' : ''}`,
           `   Category: ${p.category}`,
           p.phone ? `   Phone: ${p.phone}` : '',
