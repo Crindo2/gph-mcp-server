@@ -33,6 +33,26 @@ const TOOLS = [
       },
       required: ['category', 'state'],
     },
+    // outputSchema (task #12 rider, 2026-07-03): documents the EXISTING result shape
+    // callTool() already returns below -- additive metadata only, no behavior change.
+    // See DESIGN-NOTE-task12-category-normalization-2026-07-03.md Section 6.
+    outputSchema: {
+      type: 'object',
+      properties: {
+        content: {
+          type: 'array',
+          items: { type: 'object', properties: { type: { const: 'text' }, text: { type: 'string' } }, required: ['type', 'text'] },
+        },
+        isError: { type: 'boolean', description: 'Present and true only on failure (match request error or no candidates).' },
+        count: { type: 'integer', description: 'Total scored candidates before the top-5 slice; absent when isError.' },
+        ids: {
+          type: 'object',
+          properties: { surfaced: { type: 'array', items: { type: 'string' }, description: 'Provider slugs shown, in ranked order.' } },
+          description: 'Absent when isError.',
+        },
+      },
+      required: ['content'],
+    },
   },
   {
     name: 'search_providers',
@@ -53,6 +73,26 @@ const TOOLS = [
       },
       required: ['category'],
     },
+    // outputSchema (task #12 rider, 2026-07-03): documents the EXISTING result shape
+    // callTool() already returns below -- additive metadata only, no behavior change.
+    // See DESIGN-NOTE-task12-category-normalization-2026-07-03.md Section 6.
+    outputSchema: {
+      type: 'object',
+      properties: {
+        content: {
+          type: 'array',
+          items: { type: 'object', properties: { type: { const: 'text' }, text: { type: 'string' } }, required: ['type', 'text'] },
+        },
+        isError: { type: 'boolean', description: 'Present and true only on failure.' },
+        count: { type: 'integer', description: 'Total matching providers across all pages; absent when isError.' },
+        ids: {
+          type: 'object',
+          properties: { surfaced: { type: 'array', items: { type: 'string' }, description: 'Provider slugs on this page, in returned order.' } },
+          description: 'Absent when isError.',
+        },
+      },
+      required: ['content'],
+    },
   },
   {
     name: 'get_provider_detail',
@@ -65,6 +105,26 @@ const TOOLS = [
         slug: { type: 'string', description: "Provider slug identifier (e.g. 'ams-solutions-inc-dallas-tx'). Obtained from match_practice or search_providers response." },
       },
       required: ['slug'],
+    },
+    // outputSchema (task #12 rider, 2026-07-03): documents the EXISTING result shape
+    // callTool() already returns below -- additive metadata only, no behavior change.
+    // See DESIGN-NOTE-task12-category-normalization-2026-07-03.md Section 6.
+    outputSchema: {
+      type: 'object',
+      properties: {
+        content: {
+          type: 'array',
+          items: { type: 'object', properties: { type: { const: 'text' }, text: { type: 'string' } }, required: ['type', 'text'] },
+        },
+        isError: { type: 'boolean', description: 'Present and true only when the slug is unknown or the fetch fails.' },
+        count: { const: 1, description: 'Always 1 on success; absent when isError.' },
+        ids: {
+          type: 'object',
+          properties: { drilled: { type: 'string', description: 'The slug that was looked up.' } },
+          description: 'Absent when isError.',
+        },
+      },
+      required: ['content'],
     },
   },
 ];
