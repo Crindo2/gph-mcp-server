@@ -166,7 +166,7 @@ async function callTool(name, args) {
     const text = matches.length === 0
       ? 'No matching providers found for your criteria. Try broadening your search (e.g. remove city filter or change category).'
       : matches.map((m, i) => [
-          `${i + 1}. **${m.company_name}**${m.national_label ? ` _(${m.national_label})_` : ''}`,
+          `${i + 1}. **${m.company_name}**${m.national_label ? ` _(${m.national_label})_` : m.regional_label ? ` _(${m.regional_label})_` : ''}`,
           `   Category: ${m.category}`,
           `   Location: ${m.city || 'National'}, ${m.state_abbr || 'US'}`,
           `   Quality Score: ${m.quality_score}/100${m.verified ? ' ✓ Verified' : ''}`,
@@ -175,9 +175,11 @@ async function callTool(name, args) {
           m.website ? `   Website: ${m.website}` : '',
           `   Profile: https://www.getpracticehelp.com/providers/${m.slug}/`,
         ].filter(Boolean).join('\n')).join('\n\n');
-    // Honest-N tiered ranking (Stage 2.2, 2026-07-09 directive): surface geo_honesty_note --
-    // an all-national or empty-for-geography result set must say so here too, not just on the
-    // web widget, since this text IS the caller-facing surface for MCP clients.
+    // Honest-N tiered ranking (Stage 2.2/2.6, 2026-07-09 directive): surface geo_honesty_note --
+    // an all-national, all-regional, or empty-for-geography result set must say so here too, not
+    // just on the web widget, since this text IS the caller-facing surface for MCP clients.
+    // Generic passthrough -- the Stage 2.6 regional-only case needs no change here, only in the
+    // per-row label line above and in match.js's own geoHonestyNote computation.
     const honestyPrefix = data.geo_honesty_note ? `_${data.geo_honesty_note}_\n\n` : '';
 
     return { content: [{ type: 'text', text: `${honestyPrefix}Found ${data.total || matches.length} providers. Top ${matches.length} matches:\n\n${text}` }], count: data.total ?? matches.length, ids: { surfaced: matches.map(m => m.slug).filter(Boolean) } };
