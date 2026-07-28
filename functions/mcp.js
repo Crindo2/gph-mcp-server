@@ -219,10 +219,11 @@ async function callTool(name, args) {
     if (!args.slug) return { content: [{ type: 'text', text: 'Error: slug is required' }], isError: true };
 
     const res = await fetch(`${API_BASE}/provider/${encodeURIComponent(args.slug)}`);
-    if (!res.ok) return { content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true };
+    // count: 0 so telemetry records the miss as zero_result (D850: drill misses were invisible).
+    if (!res.ok) return { content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true, count: 0 };
 
     const data = await res.json();
-    if (!data.success || !data.provider) return { content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true };
+    if (!data.success || !data.provider) return { content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true, count: 0 };
     const p = data.provider;
     const tags = (p.services_tags || '').split(',').map(t => t.trim()).filter(Boolean);
     const text = [
@@ -505,6 +506,9 @@ async function buildTelemetry(server, request, env, toolName, args, resultsCount
     user_agent: ua,
     referer: request.headers.get('referer') || null,
     country: (request.cf && request.cf.country) || null,
+    // D850 adjudication: instrumentation-only IP-owner attribution. Additive, forward-only.
+    asn: (request.cf && request.cf.asn) || null,
+    as_organization: (request.cf && request.cf.asOrganization) || null,
     session_id: await deriveSessionId(request, env),
     funnel_step: step,
     zero_result: zero,
@@ -547,8 +551,9 @@ async function writeTelemetryD1(env, rec) {
         (ts, server, tool, caller_class, assistant_channel, source, user_agent, session_id, funnel_step,
          zero_result, results_count, api_key_tier, category, specialty, city, state, ehr_system,
          treatment_type, insurance, search_term, demand_cell, vendor_surfaced, vendor_drilled, raw_args,
-         practice_size, budget_range, practice_size_fit, field_completeness, country, referer)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         practice_size, budget_range, practice_size_fit, field_completeness, country, referer,
+         asn, as_organization)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).bind(
       rec.ts, rec.server, rec.tool, rec.caller_class, rec.assistant_channel, rec.source, rec.user_agent,
       rec.session_id, rec.funnel_step, rec.zero_result, rec.results_count, rec.api_key_tier,
@@ -556,7 +561,7 @@ async function writeTelemetryD1(env, rec) {
       rec.treatment_type, rec.insurance, rec.search_term, rec.demand_cell,
       rec.vendor_surfaced, rec.vendor_drilled, rec.raw_args,
       rec.practice_size, rec.budget_range, rec.practice_size_fit, rec.field_completeness,
-      rec.country, rec.referer
+      rec.country, rec.referer, rec.asn, rec.as_organization
     ).run();
   } catch (e) {
     console.error('writeTelemetryD1: D1 telemetry write threw:', e && e.message);
@@ -613,7 +618,9 @@ async function logToolCall(env, rec, request) {
           'Practice Size Fit': rec.practice_size_fit || '',
           ...(typeof rec.field_completeness === 'number' ? { 'Field Completeness': rec.field_completeness } : {}),
           'Country': (request && request.cf && request.cf.country) || '',
-          'Referer': (request && request.headers.get('referer')) || ''
+          'Referer': (request && request.headers.get('referer')) || '',
+          ...(typeof rec.asn === 'number' ? { 'ASN': rec.asn } : {}),
+          'AS Organization': rec.as_organization || ''
         }}],
         typecast: true
       })
