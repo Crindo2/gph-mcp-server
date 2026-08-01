@@ -14,6 +14,33 @@ const SERVER_INFO = {
   capabilities: { tools: {}, prompts: {}, resources: {} },
 };
 
+// The 25 real `providers.category` values, for enumeration inside the tool descriptions
+// (GPH-MCP-SCHEMA-FIX-01 S2, 2026-08-02). AUTHORITATIVE SOURCE IS `list_categories`, which
+// reads them live from D1 via /api/categories -- which in turn imports getpracticehelp's
+// `CANON` single-writer. This array is a display mirror, unavoidable because tools/list must
+// answer synchronously from a static schema and cannot await a remote fetch; if the two ever
+// disagree, list_categories wins and this array is the thing to fix.
+//
+// Deliberately prose, NOT a JSON-Schema `enum`: the server accepts a wide alias space on
+// purpose ('billing', 'medical-billing', 'EHR', 'Revenue Cycle Management' all resolve via
+// functions/_shared/category-alias.js), and a strict enum would make a conforming client
+// refuse those forms outright -- narrowing the surface instead of widening it.
+const GPH_CATEGORIES = [
+  'Medical Billing & RCM', 'Credentialing Services', 'Healthcare IT & EHR',
+  'Practice Management Consulting', 'Healthcare Legal Services', 'Healthcare CPA & Tax Advisory',
+  'Medical Coding Services', 'Healthcare Staffing & Recruiting',
+  'Healthcare Marketing & Reputation Management', 'Compliance & HIPAA Services',
+  'Medical Equipment & Supplies', 'Healthcare Real Estate & Site Selection',
+  'Practice Financing & Loans', 'Healthcare Construction & Facilities',
+  'Healthcare Signage & Wayfinding', 'Medical Waste & Environmental Services',
+  'Healthcare Insurance & Malpractice Brokers', 'Practice Valuation & Brokerage',
+  'Patient Financing & Payment Solutions', 'Medical Transcription & Documentation',
+  'Pharmacy & Medication Management', 'Telehealth & Virtual Care Infrastructure',
+  'Laboratory & Diagnostics Services', 'Group Purchasing Organizations (GPOs)',
+  'Healthcare PR & Communications',
+];
+const CATEGORY_LIST_TEXT = GPH_CATEGORIES.map(c => `'${c}'`).join(', ');
+
 const TOOLS = [
   {
     name: 'match_practice',
@@ -23,11 +50,19 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        category: { type: 'string', description: "Service category needed (e.g. 'Medical Billing & RCM', 'Credentialing Services', 'Healthcare IT & EHR', 'Practice Management Software')" },
+        // S1(b): 'Practice Management Software' REMOVED from this list. It was never one of the
+        // 25 real categories, so every caller who took the example at face value got zero rows
+        // (25 calls, 100% zero-result, 2 of them organic). It now routes to Practice Management
+        // Consulting via the alias layer, but it must not be advertised as a category name.
+        category: { type: 'string', description: `Service category needed. One of the 25 categories: ${CATEGORY_LIST_TEXT}. Common aliases also resolve (e.g. 'billing', 'RCM', 'EHR', 'credentialing'). Call list_categories for the live list with provider counts.` },
         specialty: { type: 'string', description: "Medical specialty of the practice (e.g. 'Family Medicine', 'Cardiology', 'Pediatrics', 'Dermatology')" },
-        practice_size: { type: 'string', description: 'Size of the practice by provider count', enum: ['Solo', 'Small', 'Mid-size', 'Large'] },
-        city: { type: 'string', description: 'City where the practice is located' },
-        state: { type: 'string', description: "Two-letter state abbreviation (e.g. 'TX', 'CA', 'NY')" },
+        // Param-name reconciliation (S5): each description now names its own parameter, because
+        // descriptions that named a DIFFERENT noun than the parameter were measurably answered
+        // with that noun -- `size` sent 31 times for practice_size, `state_abbr` 11 times for
+        // state, `min_quality_score` for min_rating. Those args were silently dropped.
+        practice_size: { type: 'string', description: 'Size of the practice by provider count. The parameter is named `practice_size`, not `size`.', enum: ['Solo', 'Small', 'Mid-size', 'Large'] },
+        city: { type: 'string', description: 'City where the practice is located. Send city and state separately, not as a combined `location` string.' },
+        state: { type: 'string', description: "Two-letter state abbreviation (e.g. 'TX', 'CA', 'NY'). Send as `state`, not `state_abbr` (`state_abbr` is an output field name only)." },
         ehr_system: { type: 'string', description: "EHR system used by the practice (e.g. 'Epic', 'athenahealth', 'AdvancedMD', 'eClinicalWorks'). Helps score providers with compatible integrations higher." },
         budget_range: { type: 'string', description: 'Approximate monthly budget', enum: ['Under $500', '$500-$2,000', '$2,000-$5,000', '$5,000+', 'Not sure'] },
       },
@@ -62,10 +97,10 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        category: { type: 'string', description: "Service category to search (e.g. 'Medical Billing & RCM', 'Credentialing Services')" },
-        state: { type: 'string', description: "Two-letter state abbreviation (e.g. 'TX'). National providers always included." },
+        category: { type: 'string', description: `Service category to search. One of the 25 categories: ${CATEGORY_LIST_TEXT}. Common aliases also resolve (e.g. 'billing', 'RCM', 'EHR', 'credentialing'). Call list_categories for the live list with provider counts. This tool does NOT accept a specialty filter -- use match_practice for specialty-aware ranking.` },
+        state: { type: 'string', description: "Two-letter state abbreviation (e.g. 'TX'). Send as `state`, not `state_abbr` (`state_abbr` is an output field name only). National providers always included." },
         city: { type: 'string', description: 'City name to filter by (partial match supported)' },
-        min_rating: { type: 'number', description: 'Minimum quality score (0-100). Most providers score 50-85.', minimum: 0, maximum: 100 },
+        min_rating: { type: 'number', description: 'Minimum quality score (0-100). Most providers score 50-85. The parameter is named `min_rating`, not `min_quality_score`.', minimum: 0, maximum: 100 },
         tier1_grade: { type: 'string', enum: ['A', 'B'], description: "Filter to the curated Tier-1 provider set by grade: 'A' (top-graded) or 'B' (strong). Tier-1 is a hand-reviewed ~4,400-provider subset; most directory records are not Tier-1, so this narrows results sharply. Omit to search the full directory." },
         practice_size_fit: { type: 'string', enum: ['Solo/Small', 'Mid-size', 'Large', 'All'], description: 'Filter providers by the practice size they best serve.' },
         per_page: { type: 'number', description: 'Results per page (1-25, default 10)', minimum: 1, maximum: 25, default: 10 },
@@ -127,6 +162,30 @@ const TOOLS = [
       required: ['content'],
     },
   },
+  {
+    // GPH-MCP-SCHEMA-FIX-01 S2 (2026-08-02). The discovery affordance. Before this tool the
+    // only way to learn a category name was to already know it: 7 of 25 categories had ever
+    // been queried in the server's entire telemetry history, leaving 67% of the directory
+    // unreachable in practice. Param-less and read-only, so it is cheap for a model to call
+    // first and it carries no demand-specification signal of its own.
+    name: 'list_categories',
+    title: 'List Healthcare Vendor Categories',
+    description: `List every service category in the GPH vendor directory with its live provider count. Call this FIRST when you do not already know which category fits the user's need, when a category search returned nothing, or when the user asks what kinds of vendors are available. Returns all 25 categories with {category, slug, providers}. The category names returned here are the exact values match_practice and search_providers expect (common aliases also resolve). Takes no arguments.`,
+    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
+    inputSchema: { type: 'object', properties: {}, required: [] },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        content: {
+          type: 'array',
+          items: { type: 'object', properties: { type: { const: 'text' }, text: { type: 'string' } }, required: ['type', 'text'] },
+        },
+        isError: { type: 'boolean', description: 'Present and true only on failure.' },
+        count: { type: 'integer', description: 'Number of categories returned; absent when isError.' },
+      },
+      required: ['content'],
+    },
+  },
 ];
 
 const PROMPTS = [
@@ -152,7 +211,115 @@ function jsonrpcError(id, code, message) {
 
 // ── Tool execution ──
 
+// ── Argument validation (GPH-MCP-SCHEMA-FIX-01 S3 + S4, 2026-08-02) ──
+//
+// Before this, `tools/call` forwarded whatever it was handed. Two measured consequences over
+// 2026-06-24..2026-08-01: (a) 91 calls omitted a parameter the schema declared REQUIRED and
+// were served anyway -- `{"query":"medical billing"}` with no category returned a whole-corpus
+// count of 74,991 as if it were an answer; (b) 68 calls carried off-schema parameters that were
+// silently dropped, so the filter vanished and the result set widened with no error and no
+// zero_result flag -- `{"category":"Medical Billing","state_abbr":"TX"}` returned 7,092 national
+// rows to a caller who asked for Texas. Silent widening is worse than an error: the caller
+// cannot tell it happened, and neither could we.
+//
+// Both checks read the tool's OWN declared schema (TOOLS above) -- there is no second list to
+// drift. Errors are structured MCP tool errors (isError), not JSON-RPC protocol errors, so a
+// model receives them as content it can act on and retry.
+
+// Nearest-valid-name hints. Seeded from the parameter names callers actually sent, per
+// mcp_usage_log, rather than guessed: `size` 31, `state_abbr` 11, `specialty`-on-search 8,
+// `query` 3, `practice_type` 3, `need` 2, `limit` 2, and singletons.
+const ARG_HINTS = {
+  size: 'practice_size', practice_type: 'specialty', need: 'category', service_needed: 'category',
+  budget: 'budget_range', ehr: 'ehr_system', ehr_name: 'ehr_system', state_abbr: 'state',
+  state_code: 'state', location: 'city` and `state', query: 'category', q: 'category',
+  search: 'category', limit: 'per_page', per_page_size: 'per_page', page_size: 'per_page',
+  min_quality_score: 'min_rating', min_quality: 'min_rating', quality_score: 'min_rating',
+  rating: 'min_rating', provider: 'slug', provider_slug: 'slug', name: 'slug', id: 'slug',
+  tier: 'tier1_grade', grade: 'tier1_grade', size_fit: 'practice_size_fit',
+};
+
+function nearestParam(unknown, valid) {
+  const hinted = ARG_HINTS[unknown];
+  if (hinted && valid.includes(hinted.split('`')[0])) return hinted;
+  const u = unknown.toLowerCase().replace(/[_-]/g, '');
+  // Substring containment either way catches the common shortening/lengthening mistakes
+  // (`spec` -> specialty, `practice_size_range` -> practice_size) without a distance metric.
+  let best = null;
+  for (const v of valid) {
+    const c = v.toLowerCase().replace(/[_-]/g, '');
+    if (c === u || c.includes(u) || u.includes(c)) { if (!best || v.length < best.length) best = v; }
+  }
+  return best;
+}
+
+function toolError(text) {
+  return { content: [{ type: 'text', text }], isError: true };
+}
+
+// Returns an error result, or null when the args are acceptable.
+// Exported for tests/arg-validate.test.mjs -- Cloudflare Pages routes only the onRequest*
+// handlers, so additional named exports from a Functions module are inert at runtime.
+export function validateArgs(toolName, args) {
+  const spec = TOOLS.find(t => t.name === toolName);
+  if (!spec) return null; // unknown tool -> callTool's own "Unknown tool" path handles it
+  const props = (spec.inputSchema && spec.inputSchema.properties) || {};
+  const valid = Object.keys(props);
+  const required = (spec.inputSchema && spec.inputSchema.required) || [];
+  const a = args || {};
+
+  // S4 first: an unrecognized parameter usually explains a missing required one (a caller who
+  // sent `need` instead of `category` is failing both checks for one reason), so naming the
+  // typo is more useful than reporting the absence.
+  const unknown = Object.keys(a).filter(k => !valid.includes(k));
+  if (unknown.length) {
+    const parts = unknown.map(k => {
+      const near = nearestParam(k, valid);
+      if (toolName === 'search_providers' && k === 'specialty') {
+        return `\`specialty\` is not a parameter of search_providers -- use match_practice, which ranks by specialty fit`;
+      }
+      return near ? `\`${k}\` is not a parameter -- did you mean \`${near}\`?` : `\`${k}\` is not a parameter`;
+    });
+    return toolError(
+      `Error: unrecognized argument${unknown.length > 1 ? 's' : ''} for ${toolName}.\n` +
+      parts.map(p => `- ${p}`).join('\n') +
+      `\n\nValid parameters: ${valid.map(v => `\`${v}\``).join(', ')}.` +
+      `\n\nThe call was NOT run. An unrecognized filter is dropped, not applied, so running it would have returned a wider result set than you asked for.`
+    );
+  }
+
+  // S3: declared-required enforcement.
+  const missing = required.filter(k => a[k] == null || String(a[k]).trim() === '');
+  if (missing.length) {
+    const pointer = missing.includes('category')
+      ? `\n\nCall list_categories to see all 25 categories with their provider counts.`
+      : '';
+    return toolError(
+      `Error: ${toolName} requires ${missing.map(m => `\`${m}\``).join(' and ')}, which ${missing.length > 1 ? 'were' : 'was'} not supplied.` +
+      `\n\nValid parameters: ${valid.map(v => `\`${v}\``).join(', ')}; required: ${required.map(v => `\`${v}\``).join(', ')}.` +
+      pointer +
+      `\n\nThe call was NOT run. Without \`${missing[0]}\` the result would describe the whole directory rather than answer the question.`
+    );
+  }
+  return null;
+}
+
 async function callTool(name, args) {
+  if (name === 'list_categories') {
+    const res = await fetch(`${API_BASE}/categories`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) return toolError(`Could not load categories: ${data.error || res.status}`);
+    const cats = data.categories || [];
+    const text = [
+      `${cats.length} service categories, ${data.total_providers?.toLocaleString?.() ?? data.total_providers} providers total:`,
+      '',
+      ...cats.map(c => `- **${c.category}** -- ${c.providers.toLocaleString()} providers`),
+      '',
+      'Pass a category name to search_providers or match_practice exactly as written above.',
+    ].join('\n');
+    return { content: [{ type: 'text', text }], count: cats.length };
+  }
+
   if (name === 'match_practice') {
     const res = await fetch(`${API_BASE}/match`, {
       method: 'POST',
@@ -434,7 +601,9 @@ function classifyCaller(ua, originHost) {
 
 function funnelStep(tool) {
   if (tool === 'get_provider_detail' || tool === 'get_facility_detail') return 'drill';
-  if (tool === 'list_states' || tool === 'get_treatment_types') return 'reference';
+  // list_categories is reference, not discover (S2): it carries no demand specification, and
+  // classing it 'discover' would inflate the discover leg of the funnel with lookup traffic.
+  if (tool === 'list_states' || tool === 'get_treatment_types' || tool === 'list_categories') return 'reference';
   return 'discover';
 }
 
@@ -662,7 +831,10 @@ async function handleMcpRequest(body, env, apiKey, ctx) {
         return jsonrpc(id, { content: [{ type: 'text', text: validation.reason }], isError: true });
       }
 
-      const result = await callTool(name, args || {});
+      // S3/S4: validate against the tool's own declared schema before serving. A rejection is
+      // still telemetered (same row shape, results_count NULL -> zero_result stays 0, so a
+      // rejection never masquerades as a genuine zero-result in the demand series).
+      const result = validateArgs(name, args || {}) || await callTool(name, args || {});
 
       // Enriched demand telemetry -> two INDEPENDENT non-blocking sinks (Airtable mirror +
       // D1 durable). Each has its own try/catch inside; allSettled so one sink's failure
