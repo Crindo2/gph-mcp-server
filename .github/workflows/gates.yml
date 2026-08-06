@@ -1,0 +1,32 @@
+name: PR Gate Suite (no deploy)
+
+# Minimal gate suite for gph-mcp-server, added to satisfy the required status
+# check named `gates` on the protect-main ruleset. The job id MUST stay `gates`
+# -- that string is the check context the ruleset requires, copied verbatim from
+# getpracticehelp's protect-main-codex-boundary ruleset. Renaming the job breaks
+# every merge on this repo.
+#
+# Added BEFORE the ruleset was enabled, deliberately: a required check that can
+# never report would brick all future merges (fail-closed in the wrong place).
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Test gate
+        run: node --test tests/*.test.mjs
