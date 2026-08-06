@@ -1,0 +1,53 @@
+-- Migration: mcp_usage_log.vendor_eligible (TELEMETRY-COLUMNS-01 Set 3, 2026-08-06).
+-- Database: gph-mcp-telemetry (the TELEMETRY_DB binding, NOT gph-providers).
+--
+-- NOT APPLIED TO REMOTE D1 BY THIS CHANGE SET. Authored only.
+--
+-- FIRST MIGRATION FILE IN THIS REPO. gph-mcp-server had no migrations/ directory; schema
+-- changes to gph-mcp-telemetry were previously applied without a tracked .sql. This file
+-- establishes the same convention the getpracticehelp repo already uses, so the next
+-- person can see what shape the table is supposed to be.
+--
+-- ── what this records ────────────────────────────────────────────────────────────
+-- The ELIGIBLE rung of the MCP selection funnel: the candidate pool a query was chosen
+-- FROM, as a JSON array of provider slugs (top 25).
+--
+--   ELIGIBLE  -- this column. Sourced from /api/match's new `eligible_slugs` field: the
+--                pool after the specialty hard-exclude and the geo-tier filter, in
+--                considered order.
+--   SELECTED  -- match_sessions.results (top 10), in the OTHER database (gph-providers).
+--   RETURNED  -- mcp_usage_log.vendor_surfaced (top 5), here.
+--
+-- Together with match_sessions.mcp_session_id (migrated separately, in the getpracticehelp
+-- repo) this makes all three rungs chainable per query. Before it, "we surfaced you 0
+-- times" and "you were never a candidate" were indistinguishable -- exactly the question a
+-- vendor asks.
+--
+-- ── SLUGS ONLY ───────────────────────────────────────────────────────────────────
+-- Every entry is re-validated against a bare-slug pattern at the telemetry boundary
+-- (sanitizeEligibleSlugs in functions/mcp.js) before it reaches this column, even though
+-- the values are server-generated from providers.slug and are never caller input. This
+-- keeps the column inside the standing GPH privacy rule that search_term / query_text is
+-- INTENTIONALLY NOT CAPTURED (ruling 2026-07-01) because free-text healthcare input is the
+-- top PHI and re-identification risk on this surface. The filter is structural: if a
+-- future upstream change ever put a company name or a query echo into eligible_slugs, it
+-- is DROPPED rather than written here.
+--
+-- ── nullability ──────────────────────────────────────────────────────────────────
+-- Nullable, no default. NULL means "no eligible pool was recorded" -- every pre-migration
+-- row, and every tool call that is not match_practice (search_providers and the reference
+-- tools have no candidate-pool concept). Deliberately distinct from a stored '[]', which
+-- would mean "the pool was evaluated and was empty". Not backfillable: historical rows
+-- never carried the field.
+--
+-- Any funnel report over this column MUST state its own coverage (rows with a non-null
+-- vendor_eligible / total match_practice rows) rather than presenting it as if it covered
+-- every call.
+--
+-- ── write path ───────────────────────────────────────────────────────────────────
+-- writeTelemetryD1 attempts the INSERT WITH this column and, on failure, retries with the
+-- exact pre-Set-3 column list. Naming a not-yet-existing column would otherwise fail the
+-- whole statement and silently lose EVERY telemetry row, not just this field. The column
+-- populates the moment this migration is applied, with no further code change.
+
+ALTER TABLE mcp_usage_log ADD COLUMN vendor_eligible TEXT;

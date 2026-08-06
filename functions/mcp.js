@@ -304,7 +304,11 @@ export function validateArgs(toolName, args) {
   return null;
 }
 
-async function callTool(name, args) {
+// TELEMETRY-COLUMNS-01 Set 3 (2026-08-06): mcpSessionId is threaded in so match_practice
+// can forward it to /api/match. It is the id THIS server already derived (see
+// deriveSessionId) -- 'm:<16 hex>' or 'd:<16 hex>' -- never the client's raw
+// Mcp-Session-Id, which is not forwarded anywhere.
+async function callTool(name, args, mcpSessionId) {
   if (name === 'list_categories') {
     const res = await fetch(`${API_BASE}/categories`);
     const data = await res.json().catch(() => ({}));
@@ -323,7 +327,21 @@ async function callTool(name, args) {
   if (name === 'match_practice') {
     const res = await fetch(`${API_BASE}/match`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        // Set 3: the join key. Before this, /api/match wrote the top-10 SELECTED set to
+        // match_sessions in `gph-providers` while this server wrote the top-5 RETURNED set
+        // to mcp_usage_log in `gph-mcp-telemetry` -- two databases with no shared key, so
+        // the funnel could not be followed for any individual query. Persisted on the far
+        // side as match_sessions.mcp_session_id.
+        //
+        // This forwards THIS SERVER'S already-derived opaque id, not the client's raw
+        // Mcp-Session-Id. The raw token never leaves this process; the derived form is
+        // already what lands in mcp_usage_log.session_id, so the join is an equality on
+        // identical strings and nothing new about the caller crosses the boundary.
+        // Omitted entirely when there is no id rather than sent empty.
+        ...(mcpSessionId ? { 'X-GPH-MCP-Session-Id': mcpSessionId } : {}),
+      },
       body: JSON.stringify(args),
     });
     const data = await res.json();
@@ -349,7 +367,11 @@ async function callTool(name, args) {
     // per-row label line above and in match.js's own geoHonestyNote computation.
     const honestyPrefix = data.geo_honesty_note ? `_${data.geo_honesty_note}_\n\n` : '';
 
-    return { content: [{ type: 'text', text: `${honestyPrefix}Found ${data.total || matches.length} providers. Top ${matches.length} matches:\n\n${text}` }], count: data.total ?? matches.length, ids: { surfaced: matches.map(m => m.slug).filter(Boolean) } };
+    // Set 3: ids.eligible carries the top-25 candidate pool /api/match now returns as
+    // eligible_slugs -- the ELIGIBLE rung, alongside surfaced (RETURNED). Telemetry only:
+    // it is NOT rendered into `text` and never reaches the caller. Re-sanitized at the
+    // telemetry boundary (sanitizeEligibleSlugs) regardless of what arrives here.
+    return { content: [{ type: 'text', text: `${honestyPrefix}Found ${data.total || matches.length} providers. Top ${matches.length} matches:\n\n${text}` }], count: data.total ?? matches.length, ids: { surfaced: matches.map(m => m.slug).filter(Boolean), eligible: data.eligible_slugs } };
   }
 
   if (name === 'search_providers') {
@@ -658,7 +680,37 @@ async function deriveSessionId(request, env) {
   return 'd:' + (await sha256hex(salt + '|' + ip + '|' + ua)).slice(0, 16);
 }
 
-async function buildTelemetry(server, request, env, toolName, args, resultsCount, tier, ids) {
+// TELEMETRY-COLUMNS-01 Set 3 (2026-08-06): vendor_eligible -- the ELIGIBLE rung of the
+// selection funnel, the pool a query was chosen FROM.
+//
+// THIS IS THE PRIVACY BOUNDARY, and it is enforced here rather than trusted upstream. The
+// rule ~40 lines below (search_term / query_text is INTENTIONALLY NOT CAPTURED on GPH,
+// ruling 2026-07-01) exists because free-text healthcare input is the top PHI and
+// re-identification risk on this surface. vendor_eligible must stay inside that rule.
+//
+// SLUGS ONLY. Every entry is re-validated against the bare-slug shape at this boundary
+// even though /api/match generates them from providers.slug and they are never caller
+// input. Structural prevention, not a comment: if a future /api/match change ever put a
+// company name, a query echo, or anything else free-form into eligible_slugs, this filter
+// drops it rather than writing it to a durable telemetry row. Capped at 25 and length-
+// capped per entry for the same reason.
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,79}$/;
+
+export function sanitizeEligibleSlugs(list) {
+  if (!Array.isArray(list)) return null;
+  const clean = [];
+  for (const s of list) {
+    if (typeof s !== 'string') continue;
+    const t = s.trim();
+    if (!SLUG_RE.test(t)) continue;      // anything that is not a bare slug is DROPPED
+    if (clean.includes(t)) continue;
+    clean.push(t);
+    if (clean.length >= 25) break;
+  }
+  return clean.length ? clean : null;
+}
+
+async function buildTelemetry(server, request, env, toolName, args, resultsCount, tier, ids, sessionId) {
   const ua = request.headers.get('user-agent') || '';
   const originHost = originHostOf(request);
   const step = funnelStep(toolName);
@@ -678,7 +730,12 @@ async function buildTelemetry(server, request, env, toolName, args, resultsCount
     // D850 adjudication: instrumentation-only IP-owner attribution. Additive, forward-only.
     asn: (request.cf && request.cf.asn) || null,
     as_organization: (request.cf && request.cf.asOrganization) || null,
-    session_id: await deriveSessionId(request, env),
+    // Set 3: derived ONCE per request now and threaded in, so the value written here is
+    // provably the same string forwarded to /api/match as X-GPH-MCP-Session-Id and stored
+    // as match_sessions.mcp_session_id. Deriving it twice would work today but would let
+    // the two drift the moment deriveSessionId gains any per-call state. Falls back to
+    // deriving locally so this function keeps working standalone.
+    session_id: sessionId || await deriveSessionId(request, env),
     funnel_step: step,
     zero_result: zero,
     results_count: rc,
@@ -706,32 +763,75 @@ async function buildTelemetry(server, request, env, toolName, args, resultsCount
     demand_cell: demandCell(server, a),
     vendor_surfaced: (ids && ids.surfaced && ids.surfaced.length) ? JSON.stringify(ids.surfaced) : null,
     vendor_drilled: (ids && ids.drilled) ? ids.drilled : null,
+    // Set 3: the ELIGIBLE rung. vendor_surfaced above is RETURNED (top 5) and
+    // match_sessions.results is SELECTED (top 10) -- with mcp_session_id now shared across
+    // both databases, the three are chainable per query for the first time. Stored as a
+    // JSON array of slugs; null (not '[]') when there is no candidate list, so "no eligible
+    // pool recorded" stays distinguishable from "the pool was empty".
+    vendor_eligible: (() => {
+      const clean = sanitizeEligibleSlugs(ids && ids.eligible);
+      return clean ? JSON.stringify(clean) : null;
+    })(),
     raw_args: JSON.stringify(a),
   };
 }
 
 // Independent, non-blocking D1 sink. Own try/catch; never throws to the caller.
+//
+// TELEMETRY-COLUMNS-01 Set 3 (2026-08-06): TWO-ATTEMPT WRITE. vendor_eligible ships in
+// migrations/2026_08_06_mcp_usage_log_vendor_eligible.sql, which is NOT applied to remote
+// D1 by this change set. Naming a not-yet-existing column in the INSERT list would make the
+// statement fail -- and because this function's catch only console.errors, EVERY telemetry
+// row would be silently lost, not just the new field. So: attempt the full write, and on
+// failure fall back to the exact pre-Set-3 column list. The row is never lost; the new
+// column populates the moment the migration lands, with no further code change.
+//
+// The fallback is keyed on nothing but the error -- no schema probing, no PRAGMA, no cached
+// capability flag that could go stale in the wrong direction.
+const TELEMETRY_BASE_COLUMNS =
+  `ts, server, tool, caller_class, assistant_channel, source, user_agent, session_id, funnel_step,
+   zero_result, results_count, api_key_tier, category, specialty, city, state, ehr_system,
+   treatment_type, insurance, search_term, demand_cell, vendor_surfaced, vendor_drilled, raw_args,
+   practice_size, budget_range, practice_size_fit, field_completeness, country, referer,
+   asn, as_organization`;
+
+function telemetryBaseBinds(rec) {
+  return [
+    rec.ts, rec.server, rec.tool, rec.caller_class, rec.assistant_channel, rec.source, rec.user_agent,
+    rec.session_id, rec.funnel_step, rec.zero_result, rec.results_count, rec.api_key_tier,
+    rec.category, rec.specialty, rec.city, rec.state, rec.ehr_system,
+    rec.treatment_type, rec.insurance, rec.search_term, rec.demand_cell,
+    rec.vendor_surfaced, rec.vendor_drilled, rec.raw_args,
+    rec.practice_size, rec.budget_range, rec.practice_size_fit, rec.field_completeness,
+    rec.country, rec.referer, rec.asn, rec.as_organization,
+  ];
+}
+
+function telemetryInsertSql(columns, bindCount) {
+  return `INSERT INTO mcp_usage_log
+        (${columns})
+       VALUES (${new Array(bindCount).fill('?').join(',')})`;
+}
+
 async function writeTelemetryD1(env, rec) {
   const db = env && env.TELEMETRY_DB;
   if (!db) { console.error('writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped'); return; }
+  const baseBinds = telemetryBaseBinds(rec);
+  try {
+    const binds = [...baseBinds, rec.vendor_eligible];
+    await db.prepare(
+      telemetryInsertSql(`${TELEMETRY_BASE_COLUMNS}, vendor_eligible`, binds.length)
+    ).bind(...binds).run();
+    return;
+  } catch (e) {
+    // Expected until the migration is applied. Logged at a distinct message so an ops read
+    // can tell "column not there yet" apart from a genuinely broken telemetry sink.
+    console.error('writeTelemetryD1: vendor_eligible write failed, retrying without it:', e && e.message);
+  }
   try {
     await db.prepare(
-      `INSERT INTO mcp_usage_log
-        (ts, server, tool, caller_class, assistant_channel, source, user_agent, session_id, funnel_step,
-         zero_result, results_count, api_key_tier, category, specialty, city, state, ehr_system,
-         treatment_type, insurance, search_term, demand_cell, vendor_surfaced, vendor_drilled, raw_args,
-         practice_size, budget_range, practice_size_fit, field_completeness, country, referer,
-         asn, as_organization)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
-    ).bind(
-      rec.ts, rec.server, rec.tool, rec.caller_class, rec.assistant_channel, rec.source, rec.user_agent,
-      rec.session_id, rec.funnel_step, rec.zero_result, rec.results_count, rec.api_key_tier,
-      rec.category, rec.specialty, rec.city, rec.state, rec.ehr_system,
-      rec.treatment_type, rec.insurance, rec.search_term, rec.demand_cell,
-      rec.vendor_surfaced, rec.vendor_drilled, rec.raw_args,
-      rec.practice_size, rec.budget_range, rec.practice_size_fit, rec.field_completeness,
-      rec.country, rec.referer, rec.asn, rec.as_organization
-    ).run();
+      telemetryInsertSql(TELEMETRY_BASE_COLUMNS, baseBinds.length)
+    ).bind(...baseBinds).run();
   } catch (e) {
     console.error('writeTelemetryD1: D1 telemetry write threw:', e && e.message);
   }
@@ -831,16 +931,23 @@ async function handleMcpRequest(body, env, apiKey, ctx) {
         return jsonrpc(id, { content: [{ type: 'text', text: validation.reason }], isError: true });
       }
 
+      // Set 3: derived ONCE here and used for BOTH the /api/match forward and the telemetry
+      // row, so the value stored as match_sessions.mcp_session_id is provably the same
+      // string stored as mcp_usage_log.session_id. That identity IS the join; deriving it
+      // independently in two places would work today and silently stop working the moment
+      // deriveSessionId gains any per-call state.
+      const mcpSessionId = await deriveSessionId(ctx.request, env);
+
       // S3/S4: validate against the tool's own declared schema before serving. A rejection is
       // still telemetered (same row shape, results_count NULL -> zero_result stays 0, so a
       // rejection never masquerades as a genuine zero-result in the demand series).
-      const result = validateArgs(name, args || {}) || await callTool(name, args || {});
+      const result = validateArgs(name, args || {}) || await callTool(name, args || {}, mcpSessionId);
 
       // Enriched demand telemetry -> two INDEPENDENT non-blocking sinks (Airtable mirror +
       // D1 durable). Each has its own try/catch inside; allSettled so one sink's failure
       // never skips the other, and neither blocks the tool response.
       const tier = validation.anonymous ? 'anonymous' : (validation.record?.plan || 'keyed');
-      const rec = await buildTelemetry('gph', ctx.request, env, name, args || {}, result.count, tier, result.ids);
+      const rec = await buildTelemetry('gph', ctx.request, env, name, args || {}, result.count, tier, result.ids, mcpSessionId);
       const telemetry = Promise.allSettled([logToolCall(env, rec, ctx.request), writeTelemetryD1(env, rec)]);
       if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(telemetry); else await telemetry;
 
