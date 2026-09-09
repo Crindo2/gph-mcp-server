@@ -8,6 +8,93 @@ const API_BASE = 'https://www.getpracticehelp.com/api';
 const AT_BASE = 'appvHqDMSu6aCwNxA';
 const AT_LOG_TABLE = 'tbl5ae8t1PbK2AMkx';
 
+// ── Enriched vendor field resolution (GPH-VENDOR-ENRICHMENT-01, stage P2-WIRE-ENRICHED-RENDER)
+//
+// /api/provider/:slug has projected the enriched_* columns for a while, and this server threw
+// every one of them away -- get_provider_detail rendered the legacy `description`,
+// `services_tags` and `practice_size_fit` instead, so the 5,715-row enriched corpus was
+// invisible to every MCP caller. Mirrors functions/_shared/enrichment.js in the
+// getpracticehelp repo; the two surfaces must resolve identically.
+//
+// PROVENANCE SPARSITY IS NOT A GROUNDING DEFECT (blob 083b18fe, Q1): the generic `provenance`
+// column is NULL on 5,713 of 5,715 enriched rows while `extraction_grounded_in` is populated
+// on all 5,715. A null provenance NEVER withholds enriched content.
+//
+// SCOPE FENCE (blob 63fb4960, V1.2): display resolution only. Nothing here reads or writes
+// sitemap admission, meta-robots, or any indexing predicate.
+
+const GROUNDED_IN_LABELS = {
+  site: 'vendor website',
+  both: 'vendor website and listing data',
+  listing: 'listing data',
+  directory: 'listing data',
+};
+
+// enriched_services_tags / _certifications / _locations arrive as JSON array TEXT.
+// '[]' and '""' are the empty encodings in the live table -- both read as absent.
+function parseJsonList(raw) {
+  if (raw === null || raw === undefined) return [];
+  if (Array.isArray(raw)) return raw.map(v => String(v).trim()).filter(Boolean);
+  const s = String(raw).trim();
+  if (!s || s === '[]' || s === '""' || s === 'null') return [];
+  if (s.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(s);
+      if (Array.isArray(parsed)) return parsed.map(v => String(v).trim()).filter(Boolean);
+    } catch {
+      // malformed array -- fall through and read it as delimited text
+    }
+  }
+  return s.split(',').map(t => t.trim()).filter(Boolean);
+}
+
+function firstNonEmpty(...vals) {
+  for (const v of vals) {
+    if (v === null || v === undefined) continue;
+    const s = String(v).trim();
+    if (s && s !== 'null') return v;
+  }
+  return null;
+}
+
+function resolveEnrichedProfile(p = {}) {
+  const enrichedDesc = firstNonEmpty(p.enriched_description);
+  const enrichedTags = parseJsonList(p.enriched_services_tags);
+  const enrichedSize = firstNonEmpty(p.enriched_practice_size_fit);
+  const enrichedYear = firstNonEmpty(p.enriched_founding_year);
+  const certifications = parseJsonList(p.enriched_certifications);
+  const locations = parseJsonList(p.enriched_locations);
+  const legacyTags = parseJsonList(p.services_tags);
+
+  return {
+    description: enrichedDesc || firstNonEmpty(p.description) || '',
+    description_source: enrichedDesc ? 'enriched' : 'legacy',
+    services_tags: enrichedTags.length ? enrichedTags : legacyTags,
+    services_tags_source: enrichedTags.length ? 'enriched' : 'legacy',
+    certifications,
+    locations,
+    practice_size_fit: enrichedSize || firstNonEmpty(p.practice_size_fit) || null,
+    practice_size_fit_source: enrichedSize ? 'enriched' : 'legacy',
+    founding_year: enrichedYear || firstNonEmpty(p.apollo_founded_year) || null,
+    founding_year_source: enrichedYear ? 'enriched' : 'legacy',
+    confidence: firstNonEmpty(p.extraction_confidence),
+    grounded_in: firstNonEmpty(p.extraction_grounded_in),
+    provenance: firstNonEmpty(p.provenance),
+    has_enrichment: Boolean(
+      enrichedDesc || enrichedTags.length || certifications.length ||
+      locations.length || enrichedSize || enrichedYear
+    ),
+  };
+}
+
+function enrichmentGroundingLabel(e) {
+  const parts = [];
+  if (e.confidence) parts.push(`${e.confidence} confidence`);
+  const src = e.provenance || (e.grounded_in ? (GROUNDED_IN_LABELS[String(e.grounded_in).toLowerCase()] || e.grounded_in) : null);
+  if (src) parts.push(`sourced from ${src}`);
+  return parts.join(', ');
+}
+
 const SERVER_INFO = {
   protocolVersion: '2024-11-05',
   serverInfo: { name: 'gph-intelligence', version: '1.1.1' },
@@ -132,7 +219,7 @@ const TOOLS = [
   {
     name: 'get_provider_detail',
     title: 'Get Vendor Profile Detail',
-    description: `Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to "tell me more about [vendor]", "what services does [vendor] offer", "is [vendor] verified", or wants contact info, services, reviews, or listing tier for a specific provider. Returns company_name, category (plus super_category grouping), description, services_tags (comma-delimited services offered), website, phone, city/state, quality_score (0-100), verified status, listing tier (free/paid), practice_size_fit, and reviews (review_count, average_rating). Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.`,
+    description: `Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to "tell me more about [vendor]", "what services does [vendor] offer", "is [vendor] verified", or wants contact info, services, reviews, or listing tier for a specific provider. Returns company_name, category (plus super_category grouping), description, services offered, certifications and compliance attestations, locations served, founding year, website, phone, city/state, quality_score (0-100), verified status, listing tier (free/paid), practice_size_fit, and reviews (review_count, average_rating). Where a vendor has been enrichment-extracted, the description, services, certifications, locations, practice-size fit and founding year come from that extraction and the response states the extraction confidence and what it was grounded in; otherwise the legacy listing fields are returned. Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -392,20 +479,31 @@ async function callTool(name, args) {
     const data = await res.json();
     if (!data.success || !data.provider) return { content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true, count: 0 };
     const p = data.provider;
-    const tags = (p.services_tags || '').split(',').map(t => t.trim()).filter(Boolean);
+    // P2-WIRE: enriched_* first, legacy columns as fallback only.
+    const e = resolveEnrichedProfile(p);
+    const tags = e.services_tags;
+    const groundingLabel = enrichmentGroundingLabel(e);
     const text = [
       `# ${p.company_name}`,
       `**Category:** ${p.category}`,
       `**Location:** ${p.city || 'National'}, ${p.state_abbr || 'US'}`,
       `**Quality Score:** ${p.quality_score}/100${p.verified ? ' ✓ Verified Listing' : ''}`,
       '',
-      p.description ? `## About\n${p.description}` : '',
+      e.description ? `## About\n${e.description}` : '',
       tags.length ? `## Services\n${tags.join(', ')}` : '',
-      `**Practice Size Fit:** ${p.practice_size_fit || 'All sizes'}`,
+      e.certifications.length ? `## Certifications & Compliance\n${e.certifications.join(', ')}` : '',
+      e.locations.length ? `## Locations Served\n${e.locations.join(', ')}` : '',
+      `**Practice Size Fit:** ${e.practice_size_fit || 'All sizes'}`,
+      e.founding_year ? `**Founded:** ${e.founding_year}` : '',
       p.phone ? `**Phone:** ${p.phone}` : '',
       p.website ? `**Website:** ${p.website}` : '',
       p.google_rating ? `**Google Rating:** ${p.google_rating}/5 (${p.google_review_count || 0} reviews)` : '',
       '',
+      // Provenance and confidence are SURFACED, not merely consumed -- a model reading this
+      // profile should be able to say how well grounded each claim is.
+      e.has_enrichment && groundingLabel
+        ? `**Profile data:** extracted from public sources (${groundingLabel}).`
+        : '',
       `**Profile:** https://www.getpracticehelp.com/providers/${p.slug}/`,
     ].filter(Boolean).join('\n');
 
