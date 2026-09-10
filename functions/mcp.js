@@ -8,20 +8,27 @@ const API_BASE = 'https://www.getpracticehelp.com/api';
 const AT_BASE = 'appvHqDMSu6aCwNxA';
 const AT_LOG_TABLE = 'tbl5ae8t1PbK2AMkx';
 
-// ── Enriched vendor field resolution (GPH-VENDOR-ENRICHMENT-01, stage P2-WIRE-ENRICHED-RENDER)
+// -- Enriched vendor field resolution (GPH-VENDOR-ENRICHMENT-01, stage P2-WIRE-ENRICHED-RENDER)
 //
 // /api/provider/:slug has projected the enriched_* columns for a while, and this server threw
 // every one of them away -- get_provider_detail rendered the legacy `description`,
 // `services_tags` and `practice_size_fit` instead, so the 5,715-row enriched corpus was
-// invisible to every MCP caller. Mirrors functions/_shared/enrichment.js in the
-// getpracticehelp repo; the two surfaces must resolve identically.
+// invisible to every MCP caller.
 //
-// PROVENANCE SPARSITY IS NOT A GROUNDING DEFECT (blob 083b18fe, Q1): the generic `provenance`
-// column is NULL on 5,713 of 5,715 enriched rows while `extraction_grounded_in` is populated
-// on all 5,715. A null provenance NEVER withholds enriched content.
-//
-// SCOPE FENCE (blob 63fb4960, V1.2): display resolution only. Nothing here reads or writes
-// sitemap admission, meta-robots, or any indexing predicate.
+// P2 REPAIR (GEN59, ALLOC-GPH-P2-REPAIR-G59-001, CHAT blob d136494c Y2). This copy and the one
+// in Crindo2/getpracticehelp functions/_shared/enrichment.js were already textually divergent
+// on 2 of 4 functions on day one, with no CI comparing them. They are now ONE sentinel-
+// delimited block, byte-identical in both repos, pinned by SHA-256 in
+// tests/fixtures/enrichment-resolver.lock.json in BOTH repos and replayed through a shared
+// production-row fixture by tests/enrichment-resolver-differential.test.mjs in BOTH repos.
+// >>> ENRICHMENT-RESOLVER-V2 BEGIN >>>
+// EVERY BYTE BETWEEN THESE TWO SENTINELS IS IDENTICAL IN Crindo2/getpracticehelp
+// (functions/_shared/enrichment.js) AND Crindo2/gph-mcp-server (functions/mcp.js). The two
+// repos do not share a module, the copies were already textually divergent on 2 of 4
+// functions on day one, and nothing compared them. An edit here MUST land in both repos in
+// the same change; tests/enrichment-resolver-differential.test.mjs in EACH repo pins this
+// block's SHA-256 to tests/fixtures/enrichment-resolver.lock.json and replays a shared
+// production-row fixture through it, so either side drifting fails its own PR gate.
 
 const GROUNDED_IN_LABELS = {
   site: 'vendor website',
@@ -30,8 +37,9 @@ const GROUNDED_IN_LABELS = {
   directory: 'listing data',
 };
 
-// enriched_services_tags / _certifications / _locations arrive as JSON array TEXT.
-// '[]' and '""' are the empty encodings in the live table -- both read as absent.
+// enriched_services_tags / _certifications / _locations are stored as JSON array TEXT.
+// '[]' and '""' are the empty encodings that show up in the live table -- both must read
+// as absent, not as an empty-but-present section header.
 function parseJsonList(raw) {
   if (raw === null || raw === undefined) return [];
   if (Array.isArray(raw)) return raw.map(v => String(v).trim()).filter(Boolean);
@@ -42,7 +50,7 @@ function parseJsonList(raw) {
       const parsed = JSON.parse(s);
       if (Array.isArray(parsed)) return parsed.map(v => String(v).trim()).filter(Boolean);
     } catch {
-      // malformed array -- fall through and read it as delimited text
+      // fall through to delimiter split -- a malformed array is still better read as text
     }
   }
   return s.split(',').map(t => t.trim()).filter(Boolean);
@@ -57,6 +65,49 @@ function firstNonEmpty(...vals) {
   return null;
 }
 
+// The verbatim pre-P2 legacy split -- `(provider.services_tags || '').split(',')...` as it
+// stood in template.js and in MCP get_provider_detail before this stage. Deliberately NOT
+// parseJsonList: an unenriched row must produce the pre-P2 tag list byte-for-byte, and
+// parseJsonList differs on the '[]' / '""' / 'null' encodings.
+function legacyServicesTags(raw) {
+  return String(raw === null || raw === undefined ? '' : raw)
+    .split(',').map(t => t.trim()).filter(Boolean);
+}
+
+/**
+ * Resolve the display-facing vendor fields.
+ *
+ * Y2.1 -- IN THIS RELEASE AN UNENRICHED ROW RENDERS BYTE-IDENTICALLY TO PRE-P2. The first
+ * build gated the new sections on the RESOLVED value rather than on has_enrichment, so the
+ * legacy fallbacks reached the whole corpus: measured local-vs-local over every servable
+ * production row, 74,984 of 74,984 rows changed render, not the 5,715 the accepted evidence
+ * describes. The `if (!hasEnrichment)` branch below returns the verbatim pre-P2 expressions
+ * -- including a null `description`, because pre-P2 rendered `provider.description` and not
+ * `''` -- so no new section and no new JSON-LD key can fire on a legacy row by construction.
+ *
+ * Y2.2 -- APOLLO-SOURCED FIELDS ARE NOT SHIPPED IN THIS RELEASE. `apollo_founded_year` never
+ * reaches a rendered surface: not on an unenriched row (which is what Y2.2 names), and not
+ * as the sole source on an enriched row either, because the only grounding disclosure this
+ * release renders describes the ENRICHMENT extraction -- an Apollo year underneath it would
+ * be attributed to an extraction that never produced it. It is carried out as
+ * `apollo_founding_year` for the disagreement rule and for tests, and is never rendered.
+ * Whether to surface Apollo with its own provenance disclosure is a separate later decision
+ * with its own evidence.
+ *
+ * Y2.3 -- DISAGREEMENT RULE. Where a row has BOTH enriched_founding_year and
+ * apollo_founded_year and they disagree, the ENRICHED value renders with its grounding and
+ * the Apollo value does not. `founding_year_disagrees` reports it; 224 servable rows are in
+ * that state today (healthware: enriched 1996 vs Apollo 1998).
+ *
+ * PROVENANCE SPARSITY IS NOT A GROUNDING DEFECT (blob 083b18fe, Q1). The generic
+ * `provenance` column is NULL on 5,713 of the 5,715 enriched rows while
+ * `extraction_grounded_in` is populated on all 5,715. A null `provenance` must NEVER be read
+ * as "ungrounded" and must NEVER withhold enriched content -- it is surfaced when present
+ * and silently yields to extraction_grounded_in when it is not.
+ *
+ * SCOPE FENCE (blob 63fb4960, V1.2). Nothing here participates in sitemap admission,
+ * meta-robots, or any indexing decision. It resolves display fields only.
+ */
 function resolveEnrichedProfile(p = {}) {
   const enrichedDesc = firstNonEmpty(p.enriched_description);
   const enrichedTags = parseJsonList(p.enriched_services_tags);
@@ -64,7 +115,34 @@ function resolveEnrichedProfile(p = {}) {
   const enrichedYear = firstNonEmpty(p.enriched_founding_year);
   const certifications = parseJsonList(p.enriched_certifications);
   const locations = parseJsonList(p.enriched_locations);
-  const legacyTags = parseJsonList(p.services_tags);
+  const apolloYear = firstNonEmpty(p.apollo_founded_year);
+  const legacyTags = legacyServicesTags(p.services_tags);
+
+  const hasEnrichment = Boolean(
+    enrichedDesc || enrichedTags.length || certifications.length ||
+    locations.length || enrichedSize || enrichedYear
+  );
+
+  if (!hasEnrichment) {
+    return {
+      description: p.description,
+      description_source: 'legacy',
+      services_tags: legacyTags,
+      services_tags_source: 'legacy',
+      certifications: [],
+      locations: [],
+      practice_size_fit: p.practice_size_fit,
+      practice_size_fit_source: 'legacy',
+      founding_year: null,
+      founding_year_source: 'none',
+      apollo_founding_year: apolloYear,
+      founding_year_disagrees: false,
+      confidence: null,
+      grounded_in: null,
+      provenance: null,
+      has_enrichment: false,
+    };
+  }
 
   return {
     description: enrichedDesc || firstNonEmpty(p.description) || '',
@@ -75,18 +153,21 @@ function resolveEnrichedProfile(p = {}) {
     locations,
     practice_size_fit: enrichedSize || firstNonEmpty(p.practice_size_fit) || null,
     practice_size_fit_source: enrichedSize ? 'enriched' : 'legacy',
-    founding_year: enrichedYear || firstNonEmpty(p.apollo_founded_year) || null,
-    founding_year_source: enrichedYear ? 'enriched' : 'legacy',
+    founding_year: enrichedYear,
+    founding_year_source: enrichedYear ? 'enriched' : 'none',
+    apollo_founding_year: apolloYear,
+    founding_year_disagrees: Boolean(
+      enrichedYear && apolloYear &&
+      String(enrichedYear).trim() !== String(apolloYear).trim()
+    ),
     confidence: firstNonEmpty(p.extraction_confidence),
     grounded_in: firstNonEmpty(p.extraction_grounded_in),
     provenance: firstNonEmpty(p.provenance),
-    has_enrichment: Boolean(
-      enrichedDesc || enrichedTags.length || certifications.length ||
-      locations.length || enrichedSize || enrichedYear
-    ),
+    has_enrichment: true,
   };
 }
 
+/** Human label for the provenance/confidence line. Empty string when there is nothing to say. */
 function enrichmentGroundingLabel(e) {
   const parts = [];
   if (e.confidence) parts.push(`${e.confidence} confidence`);
@@ -94,6 +175,14 @@ function enrichmentGroundingLabel(e) {
   if (src) parts.push(`sourced from ${src}`);
   return parts.join(', ');
 }
+// <<< ENRICHMENT-RESOLVER-V2 END <<<
+
+// Exported for tests/enrichment-resolver-differential.test.mjs -- the ONE MCP test that
+// actually exercises the enrichment resolver (d136494c Y2.4b). Before it, all 12 tests in
+// this suite were argument-validation and none touched the resolver, so the suite was a
+// no-regression signal and not P2 evidence. Cloudflare Pages routes only the onRequest*
+// handlers, so an extra named export from a Functions module is inert at runtime.
+export { resolveEnrichedProfile, enrichmentGroundingLabel, parseJsonList, legacyServicesTags };
 
 const SERVER_INFO = {
   protocolVersion: '2024-11-05',
@@ -491,10 +580,16 @@ async function callTool(name, args) {
       '',
       e.description ? `## About\n${e.description}` : '',
       tags.length ? `## Services\n${tags.join(', ')}` : '',
-      e.certifications.length ? `## Certifications & Compliance\n${e.certifications.join(', ')}` : '',
-      e.locations.length ? `## Locations Served\n${e.locations.join(', ')}` : '',
+      // P2 REPAIR (d136494c Y2.1): every line this stage ADDS gates on has_enrichment, not on
+      // the resolved value. The web renderer's form of the same defect put a "Founded" section
+      // sourced from apollo_founded_year, with no grounding disclosure of its own, on 14,267
+      // legacy rows. Y2.2: apollo_founded_year is not shipped on any surface in this release,
+      // so `founding_year` here is the enriched value or nothing. Y2.3: where the two years
+      // disagree, this is already the enriched one.
+      e.has_enrichment && e.certifications.length ? `## Certifications & Compliance\n${e.certifications.join(', ')}` : '',
+      e.has_enrichment && e.locations.length ? `## Locations Served\n${e.locations.join(', ')}` : '',
       `**Practice Size Fit:** ${e.practice_size_fit || 'All sizes'}`,
-      e.founding_year ? `**Founded:** ${e.founding_year}` : '',
+      e.has_enrichment && e.founding_year ? `**Founded:** ${e.founding_year}` : '',
       p.phone ? `**Phone:** ${p.phone}` : '',
       p.website ? `**Website:** ${p.website}` : '',
       p.google_rating ? `**Google Rating:** ${p.google_rating}/5 (${p.google_review_count || 0} reviews)` : '',

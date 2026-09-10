@@ -1,0 +1,12 @@
+{
+  "contract": "ENRICHMENT-RESOLVER-V2",
+  "why": "The enrichment resolver is duplicated across Crindo2/getpracticehelp (functions/_shared/enrichment.js) and Crindo2/gph-mcp-server (functions/mcp.js). The copies were textually divergent on 2 of 4 functions on day one and nothing compared them. This lock is the differential: both repos hash their own sentinel-delimited block and replay the same fixture, so either side drifting fails its own PR gate.",
+  "authority": "CHAT blob d136494c Y2.4 (GEN59), ALLOC-GPH-P2-REPAIR-G59-001",
+  "block_sha256_lf": "5119b25f6bb7da7021f9a92d1ce581d6b29a0487791a47a95f2be9f48b4c8a07",
+  "block_chars_lf": 7274,
+  "fixture_rows": 12,
+  "fixture_sha256_lf": "dc5fed4d2ac74fe55507c0145270970da9905147448b36c61c972924e93e3d54",
+  "expected_sha256_lf": "13423b9b4ddd8b5caf7d1bc4959ca773abdb31ea4224c464f04297b30ad1d299",
+  "fixture_source": "live Crindo2 gph-providers D1 (7a06fa73-938d-4ad7-8855-87f6806692ca), read 2026-09-09; no invented values",
+  "updated": "2026-09-09"
+}

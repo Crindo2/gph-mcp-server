@@ -1,0 +1,400 @@
+[
+  {
+    "id": 2,
+    "slug": "caspio-national-us",
+    "resolved": {
+      "description": "Caspio is a low-code platform for building custom cloud-based business applications without traditional coding, designed for business professionals to create multi-user applications at any complexity level. The platform offers enterprise-grade security and compliance capabilities, including HIPAA, SOC 2, FERPA, and WCAG compliance, with unlimited user licensing and 24/7 global support.",
+      "description_source": "enriched",
+      "services_tags": [
+        "low-code application development",
+        "HIPAA compliant apps",
+        "custom database applications",
+        "patient portal",
+        "identity management",
+        "automations",
+        "AI capabilities"
+      ],
+      "services_tags_source": "enriched",
+      "certifications": [
+        "HIPAA compliant",
+        "SOC 2 Compliance",
+        "FERPA Compliance",
+        "WCAG Compliance"
+      ],
+      "locations": [
+        "Sunnyvale, CA"
+      ],
+      "practice_size_fit": "All",
+      "practice_size_fit_source": "legacy",
+      "founding_year": 2000,
+      "founding_year_source": "enriched",
+      "apollo_founding_year": "2000",
+      "founding_year_disagrees": false,
+      "confidence": "high",
+      "grounded_in": "both",
+      "provenance": null,
+      "has_enrichment": true
+    },
+    "grounding_label": "high confidence, sourced from vendor website and listing data"
+  },
+  {
+    "id": 6,
+    "slug": "compliancy-group-national-us",
+    "resolved": {
+      "description": "Compliancy Group provides healthcare compliance management software that helps organizations complete, track, and manage compliance requirements across multiple standards. Founded in 2005 by former auditors and compliance experts, the company serves healthcare organizations seeking to increase patient loyalty and organizational profitability.",
+      "description_source": "enriched",
+      "services_tags": [
+        "compliance management",
+        "HIPAA compliance",
+        "compliance tracking",
+        "compliance requirements management"
+      ],
+      "services_tags_source": "enriched",
+      "certifications": [],
+      "locations": [],
+      "practice_size_fit": "All",
+      "practice_size_fit_source": "legacy",
+      "founding_year": 2005,
+      "founding_year_source": "enriched",
+      "apollo_founding_year": null,
+      "founding_year_disagrees": false,
+      "confidence": "medium",
+      "grounded_in": "both",
+      "provenance": null,
+      "has_enrichment": true
+    },
+    "grounding_label": "medium confidence, sourced from vendor website and listing data"
+  },
+  {
+    "id": 25,
+    "slug": "vector-choice-national-us",
+    "resolved": {
+      "description": "Vector Choice provides HIPAA compliance consulting and security services for healthcare providers. Offers compliance assessments, documentation, training, and ongoing compliance monitoring to ensure regulatory adherence.",
+      "description_source": "legacy",
+      "services_tags": [
+        "HIPAA compliance",
+        "compliance assessment",
+        "staff training",
+        "documentation support",
+        "compliance monitoring"
+      ],
+      "services_tags_source": "legacy",
+      "certifications": [],
+      "locations": [
+        "Lubbock, TX",
+        "Houston, TX"
+      ],
+      "practice_size_fit": "Mid-size",
+      "practice_size_fit_source": "legacy",
+      "founding_year": 2008,
+      "founding_year_source": "enriched",
+      "apollo_founding_year": "2008",
+      "founding_year_disagrees": false,
+      "confidence": "low",
+      "grounded_in": "serper",
+      "provenance": null,
+      "has_enrichment": true
+    },
+    "grounding_label": "low confidence, sourced from serper"
+  },
+  {
+    "id": 27,
+    "slug": "virtru-national-us",
+    "resolved": {
+      "description": "Virtru is a data security platform delivering end-to-end encryption and access control for email, files, and collaboration tools. The company provides persistent control over sensitive data shared via email, files, SaaS apps, and mission partner environments through its open-standards-based Data Security Platform. It serves enterprise, defense, and public sector organizations across multiple industries including healthcare, finance, and government.",
+      "description_source": "enriched",
+      "services_tags": [
+        "email encryption",
+        "file encryption",
+        "access control",
+        "data governance",
+        "secure collaboration",
+        "encryption key management",
+        "compliance management"
+      ],
+      "services_tags_source": "enriched",
+      "certifications": [
+        "HIPAA",
+        "ISO 27001",
+        "FedRAMP",
+        "GDPR",
+        "CJIS",
+        "CMMC",
+        "NIST",
+        "DFARS",
+        "FERPA",
+        "FTC Safeguards Rule",
+        "ITAR",
+        "PCI",
+        "GLBA",
+        "FINRA",
+        "SOX"
+      ],
+      "locations": [
+        "Washington, D.C."
+      ],
+      "practice_size_fit": "All",
+      "practice_size_fit_source": "enriched",
+      "founding_year": 2012,
+      "founding_year_source": "enriched",
+      "apollo_founding_year": "2012",
+      "founding_year_disagrees": false,
+      "confidence": "high",
+      "grounded_in": "both",
+      "provenance": null,
+      "has_enrichment": true
+    },
+    "grounding_label": "high confidence, sourced from vendor website and listing data"
+  },
+  {
+    "id": 29,
+    "slug": "birch-horton-bittner-cherot-anchorage-ak",
+    "resolved": {
+      "description": "Birch Horton Bittner & Cherot is an Anchorage-based law firm providing legal and compliance services to healthcare providers and businesses. Offers HIPAA guidance, regulatory compliance, and healthcare law advisory.",
+      "description_source": "legacy",
+      "services_tags": [
+        "healthcare law",
+        "HIPAA compliance consulting",
+        "regulatory advice",
+        "legal services",
+        "compliance documentation"
+      ],
+      "services_tags_source": "legacy",
+      "certifications": [],
+      "locations": [],
+      "practice_size_fit": "Mid-size",
+      "practice_size_fit_source": "legacy",
+      "founding_year": null,
+      "founding_year_source": "none",
+      "apollo_founding_year": "1971",
+      "founding_year_disagrees": false,
+      "confidence": null,
+      "grounded_in": null,
+      "provenance": null,
+      "has_enrichment": false
+    },
+    "grounding_label": ""
+  },
+  {
+    "id": 357,
+    "slug": "linford-company-llp-denver-co",
+    "resolved": {
+      "description": "Linford & Company is an independent auditing firm that performs SOC and HIPAA audits, HITRUST, FedRAMP, GovRAMP, NIST and CMMC assessments, penetration testing, ISO certification work, PCI DSS audits, and CSA-STAR compliance assessments.",
+      "description_source": "enriched",
+      "services_tags": [
+        "SOC 1 audits",
+        "SOC 2 audits",
+        "HIPAA audits",
+        "HITRUST assessments",
+        "FedRAMP assessments",
+        "GovRAMP assessments",
+        "NIST and CMMC assessments",
+        "Penetration testing",
+        "ISO certification",
+        "PCI DSS compliance audits",
+        "CSA-STAR compliance assessments"
+      ],
+      "services_tags_source": "enriched",
+      "certifications": [
+        "HITRUST CSF certification",
+        "ISO/IEC 27001:2022 certification",
+        "ISO/IEC 27701:2025 certification",
+        "ISO/IEC 42001:2023 certification",
+        "ISO 9001 certification",
+        "ISO 22301:2019 certification"
+      ],
+      "locations": [],
+      "practice_size_fit": "Mid-size",
+      "practice_size_fit_source": "legacy",
+      "founding_year": null,
+      "founding_year_source": "none",
+      "apollo_founding_year": "2008",
+      "founding_year_disagrees": false,
+      "confidence": "high",
+      "grounded_in": "The external IT auditors introduction and auditing services section explicitly enumerate SOC, HIPAA, HITRUST, FedRAMP, GovRAMP, NIST, CMMC, penetration testing, ISO, PCI DSS, and CSA-STAR services and name the listed certification standards.",
+      "provenance": null,
+      "has_enrichment": true
+    },
+    "grounding_label": "high confidence, sourced from The external IT auditors introduction and auditing services section explicitly enumerate SOC, HIPAA, HITRUST, FedRAMP, GovRAMP, NIST, CMMC, penetration testing, ISO, PCI DSS, and CSA-STAR services and name the listed certification standards."
+  },
+  {
+    "id": 1522,
+    "slug": "innovate-business-consulting-milford-nh",
+    "resolved": {
+      "description": "Innovate Business Consulting delivers compliance and HIPAA advisory services to healthcare organizations in New Hampshire. They assist practices in meeting regulatory requirements and implementing compliant business practices.",
+      "description_source": "legacy",
+      "services_tags": [
+        "business growth consulting",
+        "business strategy",
+        "business execution"
+      ],
+      "services_tags_source": "enriched",
+      "certifications": [],
+      "locations": [
+        "Milford, NH"
+      ],
+      "practice_size_fit": "Small",
+      "practice_size_fit_source": "enriched",
+      "founding_year": null,
+      "founding_year_source": "none",
+      "apollo_founding_year": "2000",
+      "founding_year_disagrees": false,
+      "confidence": "low",
+      "grounded_in": "site",
+      "provenance": null,
+      "has_enrichment": true
+    },
+    "grounding_label": "low confidence, sourced from vendor website"
+  },
+  {
+    "id": 2513,
+    "slug": "assured-medical-credentialing-national-us",
+    "resolved": {
+      "description": "Assured Medical Credentialing delivers credentialing and provider enrollment services to U.S. healthcare organizations. The company manages licensing, certification, and payor credentialing.",
+      "description_source": "legacy",
+      "services_tags": [
+        "provider credentialing",
+        "provider enrollment",
+        "medical licensing",
+        "payor credentialing"
+      ],
+      "services_tags_source": "legacy",
+      "certifications": [],
+      "locations": [],
+      "practice_size_fit": "All",
+      "practice_size_fit_source": "legacy",
+      "founding_year": null,
+      "founding_year_source": "none",
+      "apollo_founding_year": null,
+      "founding_year_disagrees": false,
+      "confidence": null,
+      "grounded_in": null,
+      "provenance": null,
+      "has_enrichment": false
+    },
+    "grounding_label": ""
+  },
+  {
+    "id": 3724,
+    "slug": "omnimd-hawthorne-ny",
+    "resolved": {
+      "description": "OmniMD provides EHR, medical billing, and AI-powered revenue cycle management solutions designed to streamline practice operations and enhance reimbursement. The platform offers integrated tools including AI medical coding, denial management, and automated billing processes for healthcare practices.",
+      "description_source": "enriched",
+      "services_tags": [
+        "EHR",
+        "medical billing",
+        "AI medical coding",
+        "denial management",
+        "revenue cycle management",
+        "front desk automation",
+        "medical scribe AI"
+      ],
+      "services_tags_source": "enriched",
+      "certifications": [],
+      "locations": [
+        "Hawthorne, NY",
+        "Tarrytown, NY"
+      ],
+      "practice_size_fit": "All",
+      "practice_size_fit_source": "enriched",
+      "founding_year": null,
+      "founding_year_source": "none",
+      "apollo_founding_year": "2002",
+      "founding_year_disagrees": false,
+      "confidence": "high",
+      "grounded_in": "site",
+      "provenance": "{\"parent_company\":\"Integrated Systems Management Inc.\",\"category_correction\":{\"from\":\"Credentialing Services\",\"to\":\"Medical Billing & RCM\",\"reason\":\"grounded enrichment lists EHR/medical billing/RCM/AI coding/denial management as core services; original Credentialing assignment was an extraction artifact from a credentialing-flavored web-search source\",\"date\":\"2026-06-12\",\"authority\":\"Bryan ruling 2026-06-12\",\"classification\":\"data correction, not part of any paid offer\"},\"merge\":{\"primary_id\":3724,\"merged_from_id\":9948,\"merged_from_slug\":\"integrated-systems-management-inc-omnimd-tarrytown-ny\",\"date\":\"2026-06-12\"}}",
+      "has_enrichment": true
+    },
+    "grounding_label": "high confidence, sourced from {\"parent_company\":\"Integrated Systems Management Inc.\",\"category_correction\":{\"from\":\"Credentialing Services\",\"to\":\"Medical Billing & RCM\",\"reason\":\"grounded enrichment lists EHR/medical billing/RCM/AI coding/denial management as core services; original Credentialing assignment was an extraction artifact from a credentialing-flavored web-search source\",\"date\":\"2026-06-12\",\"authority\":\"Bryan ruling 2026-06-12\",\"classification\":\"data correction, not part of any paid offer\"},\"merge\":{\"primary_id\":3724,\"merged_from_id\":9948,\"merged_from_slug\":\"integrated-systems-management-inc-omnimd-tarrytown-ny\",\"date\":\"2026-06-12\"}}"
+  },
+  {
+    "id": 8022,
+    "slug": "healthware-systems-elgin-il",
+    "resolved": {
+      "description": "HealthWare Systems provides AI-powered automation solutions for healthcare organizations, specializing in document automation, workflow optimization, and agentic AI/RPA to handle complex healthcare workflows. The company offers purpose-built AI solutions for eligibility verification, prior authorization, and clinical documentation, along with implementation and training services.",
+      "description_source": "enriched",
+      "services_tags": [
+        "document automation",
+        "OCR",
+        "agentic AI",
+        "RPA",
+        "workflow automation",
+        "eligibility verification",
+        "prior authorization",
+        "clinical documentation"
+      ],
+      "services_tags_source": "enriched",
+      "certifications": [
+        "HIPAA compliant",
+        "HITRUST compliant",
+        "SOC 2"
+      ],
+      "locations": [
+        "Elgin, IL"
+      ],
+      "practice_size_fit": "All",
+      "practice_size_fit_source": "enriched",
+      "founding_year": 1996,
+      "founding_year_source": "enriched",
+      "apollo_founding_year": "1998",
+      "founding_year_disagrees": true,
+      "confidence": "high",
+      "grounded_in": "both",
+      "provenance": null,
+      "has_enrichment": true
+    },
+    "grounding_label": "high confidence, sourced from vendor website and listing data"
+  },
+  {
+    "id": 103375,
+    "slug": "accountable-hq-national-us",
+    "resolved": {
+      "description": null,
+      "description_source": "legacy",
+      "services_tags": [],
+      "services_tags_source": "legacy",
+      "certifications": [],
+      "locations": [],
+      "practice_size_fit": "All",
+      "practice_size_fit_source": "legacy",
+      "founding_year": null,
+      "founding_year_source": "none",
+      "apollo_founding_year": null,
+      "founding_year_disagrees": false,
+      "confidence": null,
+      "grounded_in": null,
+      "provenance": null,
+      "has_enrichment": false
+    },
+    "grounding_label": ""
+  },
+  {
+    "id": 103379,
+    "slug": "unitas-dental-mesa-az",
+    "resolved": {
+      "description": "Unitas Dental provides PPO fee negotiation, insurance strategy, and outsourced credentialing services to dental practices nationwide, including startups, established practices, and fee-for-service offices evaluating PPO participation.",
+      "description_source": "legacy",
+      "services_tags": [
+        "dental credentialing",
+        "PPO fee negotiation",
+        "insurance strategy",
+        "payer enrollment"
+      ],
+      "services_tags_source": "legacy",
+      "certifications": [],
+      "locations": [],
+      "practice_size_fit": "All",
+      "practice_size_fit_source": "legacy",
+      "founding_year": null,
+      "founding_year_source": "none",
+      "apollo_founding_year": null,
+      "founding_year_disagrees": false,
+      "confidence": null,
+      "grounded_in": null,
+      "provenance": null,
+      "has_enrichment": false
+    },
+    "grounding_label": ""
+  }
+]
