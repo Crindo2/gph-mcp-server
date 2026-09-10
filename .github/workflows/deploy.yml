@@ -1,0 +1,122 @@
+name: Deploy gph-mcp-server to Cloudflare Pages
+
+# AG5.3 (GEN60, ALLOC-GPH-P3B-FIXES-G60-001) -- THIS REPO HAD NO DEPLOY PATH.
+#
+# THE DEFECT. Until this file, the only workflow in gph-mcp-server was
+# `.github/workflows/gates.yml` -- "PR Gate Suite (no deploy)" -- with two runs
+# ever (34429043289, 31231116934). Nothing in the repo deployed anything. The
+# production Cloudflare Pages deployment serving https://gph-mcp-server.pages.dev/mcp
+# was 50691a9a-9413-421a-b9a2-225cd920f18d, created 2026-08-01, built from commit
+# fa2e0eff252e8dfe5086071ae2f7d08d76ac0f87 -- five commits and 39 days behind
+# main (8f7a4ec7c04800d96654bfe3128855feb200365d, 2026-09-09), which by then
+# carried the whole P2 wire AND the Z1 PII render fix.
+#
+# WHY THAT WAS INVISIBLE RATHER THAN MERELY STALE. getpracticehelp's `gates`
+# workflow fetches THIS repo's main copy of functions/mcp.js at PR time and
+# compares the ENRICHMENT-RESOLVER-V2 block hash across the two repos. It reads
+# main. Main was correct. So the cross-repo differential reported green over a
+# surface that had never served that code -- and would have gone on reporting
+# green indefinitely, because nothing anywhere compared main to what was
+# actually deployed. A merge here was not an event: it produced no run, no
+# artifact, and no record. That is what this file changes. After it, a merge to
+# main produces a GitHub Actions run id and a Cloudflare deployment id, and the
+# deployed commit_hash can be read back from the Pages API and compared to main.
+#
+# SCOPE. This is the whole of the fix: run the EXISTING gate suite, then deploy
+# on main. It adds no new gate, no new test, and no release machinery. The gate
+# step is deliberately the same `node --test tests/*.test.mjs` command gates.yml
+# runs -- not a copy of its logic -- so a deploy cannot pass a weaker bar than a
+# PR. gates.yml is left exactly as it is: it is the check context named by the
+# protect-main ruleset (job id `gates`) and renaming or absorbing it would break
+# every merge on this repo.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A deploy is a write to one production surface. Two overlapping runs can land
+  # in either order, so the deployed commit would not be a function of main.
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          # Same as gates.yml. wrangler 4.x requires Node >=22; pinning lower
+          # here is the EBADENGINE failure getpracticehelp's deploy already hit.
+          node-version: '22'
+
+      - name: Test gate (blocks deploy on failure)
+        # Byte-identical to the gate suite in gates.yml. Includes the
+        # ENRICHMENT-RESOLVER-V2 differential, which asserts this repo's copy of
+        # the resolver still hashes to the contract pinned in
+        # tests/fixtures/enrichment-resolver.lock.json and replays the shared
+        # production-row fixture through it. A resolver that has drifted from
+        # getpracticehelp must not reach the live MCP endpoint.
+        run: node --test tests/*.test.mjs
+
+      - name: Assert deploy credential is present (fail closed, fail loud)
+        # Without this, a missing or empty CLOUDFLARE_API_TOKEN reaches wrangler
+        # as an empty string. That is the same failure shape this whole file
+        # exists to close: a workflow that appears to have run while the live
+        # surface did not change. Checked BEFORE the deploy step so the run goes
+        # red on the precondition rather than somewhere inside wrangler.
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is not set on Crindo2/gph-mcp-server."
+            echo "::error::This repo had no deploy path and therefore no deploy secret."
+            echo "::error::Add a repository secret CLOUDFLARE_API_TOKEN with Cloudflare Pages:Edit"
+            echo "::error::on account 600f222a72e5bc0d62cc12c3086ddfee, then re-run this workflow."
+            exit 1
+          fi
+          echo "CLOUDFLARE_API_TOKEN is present."
+
+      - name: Deploy to Cloudflare Pages (production)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 600f222a72e5bc0d62cc12c3086ddfee
+        run: |
+          npm install -g wrangler
+          npx wrangler pages deploy . \
+            --project-name=gph-mcp-server \
+            --branch=main
+
+      - name: Read the deployed commit back from the Cloudflare Pages API
+        # SELF-REPORT IS NOT VERIFICATION. A successful wrangler exit says the
+        # command returned 0, not that production now serves this commit. This
+        # step reads the destination -- the project's latest PRODUCTION
+        # deployment -- and fails the run if its commit_hash is not this run's
+        # SHA. It is the check that would have caught the 39-day drift on the
+        # day it started.
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          ACCOUNT=600f222a72e5bc0d62cc12c3086ddfee
+          RESP=$(curl -sS --fail-with-body \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/pages/projects/gph-mcp-server/deployments?env=production&per_page=1")
+          DEPLOYED=$(printf '%s' "$RESP" | jq -r '.result[0].deployment_trigger.metadata.commit_hash // empty')
+          DEPLOY_ID=$(printf '%s' "$RESP" | jq -r '.result[0].id // empty')
+          echo "cloudflare deployment id : ${DEPLOY_ID:-<none>}"
+          echo "deployed commit_hash     : ${DEPLOYED:-<none>}"
+          echo "this run's GITHUB_SHA    : ${GITHUB_SHA}"
+          if [ "${DEPLOYED}" != "${GITHUB_SHA}" ]; then
+            echo "::error::Deployed commit does not equal this run's commit -- production did not move."
+            exit 1
+          fi
+          echo "VERIFIED: production serves ${GITHUB_SHA} (deployment ${DEPLOY_ID})."
