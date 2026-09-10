@@ -1,0 +1,13 @@
+{
+  "contract": "ENRICHMENT-RESOLVER-V2",
+  "why": "The enrichment resolver is duplicated across Crindo2/getpracticehelp (functions/_shared/enrichment.js) and Crindo2/gph-mcp-server (functions/mcp.js). The copies were textually divergent on 2 of 4 functions on day one and nothing compared them. This lock is the differential: both repos hash their own sentinel-delimited block and replay the same fixture, so either side drifting fails its own PR gate.",
+  "authority": "CHAT blob 053f2e83 Z1 (GEN59), ALLOC-GPH-Z1-PII-FIX-G59-001; supersedes the d136494c Y2.4 pin from ALLOC-GPH-P2-REPAIR-G59-001",
+  "block_sha256_lf": "f7c4161e75bae236fc7594d90f7b9d5308df6107eca953ea63d5d62f9b41e1b0",
+  "block_chars_lf": 10299,
+  "fixture_rows": 12,
+  "fixture_sha256_lf": "dc5fed4d2ac74fe55507c0145270970da9905147448b36c61c972924e93e3d54",
+  "expected_sha256_lf": "35ae6035541e3618cad058a12b9f5275d9f8167d1d5815c221119c7badfb192b",
+  "fixture_source": "live Crindo2 gph-providers D1 (7a06fa73-938d-4ad7-8855-87f6806692ca), read 2026-09-09; no invented values",
+  "updated": "2026-09-09",
+  "z1": "Z1 -- the public grounding label no longer reads `provenance` and no longer emits any stored string. It reads extraction_grounded_in and extraction_confidence as KEYS into two closed maps written in the resolver itself; an unmapped value renders no clause. The resolver no longer returns a `provenance` field at all. `provenance` is UNCHANGED in the store -- render rule, not a data change."
+}

@@ -8,6 +8,225 @@ const API_BASE = 'https://www.getpracticehelp.com/api';
 const AT_BASE = 'appvHqDMSu6aCwNxA';
 const AT_LOG_TABLE = 'tbl5ae8t1PbK2AMkx';
 
+// -- Enriched vendor field resolution (GPH-VENDOR-ENRICHMENT-01, stage P2-WIRE-ENRICHED-RENDER)
+//
+// /api/provider/:slug has projected the enriched_* columns for a while, and this server threw
+// every one of them away -- get_provider_detail rendered the legacy `description`,
+// `services_tags` and `practice_size_fit` instead, so the 5,715-row enriched corpus was
+// invisible to every MCP caller.
+//
+// P2 REPAIR (GEN59, ALLOC-GPH-P2-REPAIR-G59-001, CHAT blob d136494c Y2). This copy and the one
+// in Crindo2/getpracticehelp functions/_shared/enrichment.js were already textually divergent
+// on 2 of 4 functions on day one, with no CI comparing them. They are now ONE sentinel-
+// delimited block, byte-identical in both repos, pinned by SHA-256 in
+// tests/fixtures/enrichment-resolver.lock.json in BOTH repos and replayed through a shared
+// production-row fixture by tests/enrichment-resolver-differential.test.mjs in BOTH repos.
+// >>> ENRICHMENT-RESOLVER-V2 BEGIN >>>
+// EVERY BYTE BETWEEN THESE TWO SENTINELS IS IDENTICAL IN Crindo2/getpracticehelp
+// (functions/_shared/enrichment.js) AND Crindo2/gph-mcp-server (functions/mcp.js). The two
+// repos do not share a module, the copies were already textually divergent on 2 of 4
+// functions on day one, and nothing compared them. An edit here MUST land in both repos in
+// the same change; tests/enrichment-resolver-differential.test.mjs in EACH repo pins this
+// block's SHA-256 to tests/fixtures/enrichment-resolver.lock.json and replays a shared
+// production-row fixture through it, so either side drifting fails its own PR gate.
+
+// Z1 (GEN59, CHAT blob 053f2e83) -- THE PUBLIC SOURCE CLAUSE IS A CLOSED VOCABULARY.
+// `extraction_grounded_in` is the ONLY column the public grounding label may consult, and it
+// is consulted as a KEY, never as text. A value absent from this map renders NO source clause
+// at all -- not passed through, not truncated, not sanitised. That is why this is a Map with
+// an explicit lookup and not an object literal with `||` fallthrough: an object literal
+// answers for keys nobody wrote (`constructor`, `toString`), and the `||` fallthrough is
+// precisely the branch that turned a stored string into public copy.
+//
+// WHAT REACHES IT TODAY -- corpus-wide over the 6,050-row servable enriched cohort, read from
+// D1 7a06fa73 on 2026-09-09, not sampled: 'both' 2,681, 'site' 2,045, 'serper' 1,026, 'none'
+// 120, plus 178 rows each holding a UNIQUE whole extraction-rationale SENTENCE (5,872 + 178
+// = 6,050). Only the first two are source names, so only those two render a clause. `serper`
+// is a scraping vendor and is not named to a public reader (Z1.3); `none` says nothing
+// (Z1.3); a rationale sentence is internal reasoning, not a citation (Z1.2).
+const GROUNDED_IN_LABELS = new Map([
+  ['site', 'vendor website'],
+  ['both', 'vendor website and listing data'],
+  ['listing', 'listing data'],
+  ['directory', 'listing data'],
+]);
+
+// The same closure on the confidence clause. `extraction_confidence` is a stored column that
+// renders verbatim into public copy -- the identical shape of defect Z1 names for
+// `provenance`. It holds only high/medium/low today (3,051 / 2,175 / 824 over the cohort);
+// this map keeps that true whatever a later writer puts in the column.
+const CONFIDENCE_LABELS = new Map([
+  ['high', 'high'],
+  ['medium', 'medium'],
+  ['low', 'low'],
+]);
+
+// enriched_services_tags / _certifications / _locations are stored as JSON array TEXT.
+// '[]' and '""' are the empty encodings that show up in the live table -- both must read
+// as absent, not as an empty-but-present section header.
+function parseJsonList(raw) {
+  if (raw === null || raw === undefined) return [];
+  if (Array.isArray(raw)) return raw.map(v => String(v).trim()).filter(Boolean);
+  const s = String(raw).trim();
+  if (!s || s === '[]' || s === '""' || s === 'null') return [];
+  if (s.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(s);
+      if (Array.isArray(parsed)) return parsed.map(v => String(v).trim()).filter(Boolean);
+    } catch {
+      // fall through to delimiter split -- a malformed array is still better read as text
+    }
+  }
+  return s.split(',').map(t => t.trim()).filter(Boolean);
+}
+
+function firstNonEmpty(...vals) {
+  for (const v of vals) {
+    if (v === null || v === undefined) continue;
+    const s = String(v).trim();
+    if (s && s !== 'null') return v;
+  }
+  return null;
+}
+
+// The verbatim pre-P2 legacy split -- `(provider.services_tags || '').split(',')...` as it
+// stood in template.js and in MCP get_provider_detail before this stage. Deliberately NOT
+// parseJsonList: an unenriched row must produce the pre-P2 tag list byte-for-byte, and
+// parseJsonList differs on the '[]' / '""' / 'null' encodings.
+function legacyServicesTags(raw) {
+  return String(raw === null || raw === undefined ? '' : raw)
+    .split(',').map(t => t.trim()).filter(Boolean);
+}
+
+/**
+ * Resolve the display-facing vendor fields.
+ *
+ * Y2.1 -- IN THIS RELEASE AN UNENRICHED ROW RENDERS BYTE-IDENTICALLY TO PRE-P2. The first
+ * build gated the new sections on the RESOLVED value rather than on has_enrichment, so the
+ * legacy fallbacks reached the whole corpus: measured local-vs-local over every servable
+ * production row, 74,984 of 74,984 rows changed render, not the 5,715 the accepted evidence
+ * describes. The `if (!hasEnrichment)` branch below returns the verbatim pre-P2 expressions
+ * -- including a null `description`, because pre-P2 rendered `provider.description` and not
+ * `''` -- so no new section and no new JSON-LD key can fire on a legacy row by construction.
+ *
+ * Y2.2 -- APOLLO-SOURCED FIELDS ARE NOT SHIPPED IN THIS RELEASE. `apollo_founded_year` never
+ * reaches a rendered surface: not on an unenriched row (which is what Y2.2 names), and not
+ * as the sole source on an enriched row either, because the only grounding disclosure this
+ * release renders describes the ENRICHMENT extraction -- an Apollo year underneath it would
+ * be attributed to an extraction that never produced it. It is carried out as
+ * `apollo_founding_year` for the disagreement rule and for tests, and is never rendered.
+ * Whether to surface Apollo with its own provenance disclosure is a separate later decision
+ * with its own evidence.
+ *
+ * Y2.3 -- DISAGREEMENT RULE. Where a row has BOTH enriched_founding_year and
+ * apollo_founded_year and they disagree, the ENRICHED value renders with its grounding and
+ * the Apollo value does not. `founding_year_disagrees` reports it; 224 servable rows are in
+ * that state today (healthware: enriched 1996 vs Apollo 1998).
+ *
+ * Z1 -- `provenance` IS NOT A DISPLAY FIELD AND NO LONGER LEAVES THIS FUNCTION (GEN59, CHAT
+ * blob 053f2e83). It is an internal operational column. Two rows of the enriched cohort hold
+ * internal prose in it today -- id 3724 a merge record, id 83589 an audit paragraph carrying
+ * a third party's personal email address and phone number -- and eight further rows outside
+ * the cohort hold the same kind of note, shielded only by the `!hasEnrichment` early return
+ * below. The earlier build PREFERRED this column for the public source clause, so both would
+ * have published verbatim to the provider page and through MCP. The fix is not an allowlist
+ * of values: the column is not public, so the display resolver does not carry it out at all.
+ * The column is UNCHANGED IN THE STORE -- this is a render rule, not a data change. The
+ * amendment it supersedes (blob 083b18fe, Q1: "a null provenance must never withhold enriched
+ * content") is satisfied a fortiori -- provenance now withholds nothing, because nothing
+ * reads it.
+ *
+ * SCOPE FENCE (blob 63fb4960, V1.2). Nothing here participates in sitemap admission,
+ * meta-robots, or any indexing decision. It resolves display fields only.
+ */
+function resolveEnrichedProfile(p = {}) {
+  const enrichedDesc = firstNonEmpty(p.enriched_description);
+  const enrichedTags = parseJsonList(p.enriched_services_tags);
+  const enrichedSize = firstNonEmpty(p.enriched_practice_size_fit);
+  const enrichedYear = firstNonEmpty(p.enriched_founding_year);
+  const certifications = parseJsonList(p.enriched_certifications);
+  const locations = parseJsonList(p.enriched_locations);
+  const apolloYear = firstNonEmpty(p.apollo_founded_year);
+  const legacyTags = legacyServicesTags(p.services_tags);
+
+  const hasEnrichment = Boolean(
+    enrichedDesc || enrichedTags.length || certifications.length ||
+    locations.length || enrichedSize || enrichedYear
+  );
+
+  if (!hasEnrichment) {
+    return {
+      description: p.description,
+      description_source: 'legacy',
+      services_tags: legacyTags,
+      services_tags_source: 'legacy',
+      certifications: [],
+      locations: [],
+      practice_size_fit: p.practice_size_fit,
+      practice_size_fit_source: 'legacy',
+      founding_year: null,
+      founding_year_source: 'none',
+      apollo_founding_year: apolloYear,
+      founding_year_disagrees: false,
+      confidence: null,
+      grounded_in: null,
+      has_enrichment: false,
+    };
+  }
+
+  return {
+    description: enrichedDesc || firstNonEmpty(p.description) || '',
+    description_source: enrichedDesc ? 'enriched' : 'legacy',
+    services_tags: enrichedTags.length ? enrichedTags : legacyTags,
+    services_tags_source: enrichedTags.length ? 'enriched' : 'legacy',
+    certifications,
+    locations,
+    practice_size_fit: enrichedSize || firstNonEmpty(p.practice_size_fit) || null,
+    practice_size_fit_source: enrichedSize ? 'enriched' : 'legacy',
+    founding_year: enrichedYear,
+    founding_year_source: enrichedYear ? 'enriched' : 'none',
+    apollo_founding_year: apolloYear,
+    founding_year_disagrees: Boolean(
+      enrichedYear && apolloYear &&
+      String(enrichedYear).trim() !== String(apolloYear).trim()
+    ),
+    confidence: firstNonEmpty(p.extraction_confidence),
+    grounded_in: firstNonEmpty(p.extraction_grounded_in),
+    has_enrichment: true,
+  };
+}
+
+/**
+ * Human label for the grounding line. Empty string when there is nothing to say.
+ *
+ * Z1 -- EVERY BYTE THIS FUNCTION CAN EMIT IS WRITTEN IN THIS FILE. It reads two stored
+ * columns and uses BOTH only as map keys, so the set of strings it can return is finite and
+ * enumerable from source, and contains no stored text: the twelve combinations of
+ * {high, medium, low} x {vendor website, vendor website and listing data, listing data},
+ * those three confidence clauses alone, those three source clauses alone, and ''. There is no
+ * path by which a value out of the database becomes public copy. That is the property the
+ * corpus scan asserts, and it is the property an allowlist of stored VALUES would not give:
+ * an allowlist makes the public surface depend on what a column happens to contain, and this
+ * does not depend on the column's contents at all.
+ */
+function enrichmentGroundingLabel(e) {
+  const key = v => (v === null || v === undefined ? '' : String(v).trim().toLowerCase());
+  const parts = [];
+  const conf = CONFIDENCE_LABELS.get(key(e.confidence));
+  if (conf) parts.push(`${conf} confidence`);
+  const src = GROUNDED_IN_LABELS.get(key(e.grounded_in));
+  if (src) parts.push(`sourced from ${src}`);
+  return parts.join(', ');
+}
+// <<< ENRICHMENT-RESOLVER-V2 END <<<
+
+// Exported for tests/enrichment-resolver-differential.test.mjs -- the ONE MCP test that
+// actually exercises the enrichment resolver (d136494c Y2.4b). Before it, all 12 tests in
+// this suite were argument-validation and none touched the resolver, so the suite was a
+// no-regression signal and not P2 evidence. Cloudflare Pages routes only the onRequest*
+// handlers, so an extra named export from a Functions module is inert at runtime.
+export { resolveEnrichedProfile, enrichmentGroundingLabel, parseJsonList, legacyServicesTags };
+
 const SERVER_INFO = {
   protocolVersion: '2024-11-05',
   serverInfo: { name: 'gph-intelligence', version: '1.1.1' },
@@ -132,7 +351,7 @@ const TOOLS = [
   {
     name: 'get_provider_detail',
     title: 'Get Vendor Profile Detail',
-    description: `Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to "tell me more about [vendor]", "what services does [vendor] offer", "is [vendor] verified", or wants contact info, services, reviews, or listing tier for a specific provider. Returns company_name, category (plus super_category grouping), description, services_tags (comma-delimited services offered), website, phone, city/state, quality_score (0-100), verified status, listing tier (free/paid), practice_size_fit, and reviews (review_count, average_rating). Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.`,
+    description: `Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to "tell me more about [vendor]", "what services does [vendor] offer", "is [vendor] verified", or wants contact info, services, reviews, or listing tier for a specific provider. Returns company_name, category (plus super_category grouping), description, services offered, certifications and compliance attestations, locations served, founding year, website, phone, city/state, quality_score (0-100), verified status, listing tier (free/paid), practice_size_fit, and reviews (review_count, average_rating). Where a vendor has been enrichment-extracted, the description, services, certifications, locations, practice-size fit and founding year come from that extraction and the response states the extraction confidence and what it was grounded in; otherwise the legacy listing fields are returned. Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -392,20 +611,37 @@ async function callTool(name, args) {
     const data = await res.json();
     if (!data.success || !data.provider) return { content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true, count: 0 };
     const p = data.provider;
-    const tags = (p.services_tags || '').split(',').map(t => t.trim()).filter(Boolean);
+    // P2-WIRE: enriched_* first, legacy columns as fallback only.
+    const e = resolveEnrichedProfile(p);
+    const tags = e.services_tags;
+    const groundingLabel = enrichmentGroundingLabel(e);
     const text = [
       `# ${p.company_name}`,
       `**Category:** ${p.category}`,
       `**Location:** ${p.city || 'National'}, ${p.state_abbr || 'US'}`,
       `**Quality Score:** ${p.quality_score}/100${p.verified ? ' ✓ Verified Listing' : ''}`,
       '',
-      p.description ? `## About\n${p.description}` : '',
+      e.description ? `## About\n${e.description}` : '',
       tags.length ? `## Services\n${tags.join(', ')}` : '',
-      `**Practice Size Fit:** ${p.practice_size_fit || 'All sizes'}`,
+      // P2 REPAIR (d136494c Y2.1): every line this stage ADDS gates on has_enrichment, not on
+      // the resolved value. The web renderer's form of the same defect put a "Founded" section
+      // sourced from apollo_founded_year, with no grounding disclosure of its own, on 14,267
+      // legacy rows. Y2.2: apollo_founded_year is not shipped on any surface in this release,
+      // so `founding_year` here is the enriched value or nothing. Y2.3: where the two years
+      // disagree, this is already the enriched one.
+      e.has_enrichment && e.certifications.length ? `## Certifications & Compliance\n${e.certifications.join(', ')}` : '',
+      e.has_enrichment && e.locations.length ? `## Locations Served\n${e.locations.join(', ')}` : '',
+      `**Practice Size Fit:** ${e.practice_size_fit || 'All sizes'}`,
+      e.has_enrichment && e.founding_year ? `**Founded:** ${e.founding_year}` : '',
       p.phone ? `**Phone:** ${p.phone}` : '',
       p.website ? `**Website:** ${p.website}` : '',
       p.google_rating ? `**Google Rating:** ${p.google_rating}/5 (${p.google_review_count || 0} reviews)` : '',
       '',
+      // Provenance and confidence are SURFACED, not merely consumed -- a model reading this
+      // profile should be able to say how well grounded each claim is.
+      e.has_enrichment && groundingLabel
+        ? `**Profile data:** extracted from public sources (${groundingLabel}).`
+        : '',
       `**Profile:** https://www.getpracticehelp.com/providers/${p.slug}/`,
     ].filter(Boolean).join('\n');
 
