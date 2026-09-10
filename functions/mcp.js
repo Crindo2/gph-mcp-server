@@ -30,12 +30,36 @@ const AT_LOG_TABLE = 'tbl5ae8t1PbK2AMkx';
 // block's SHA-256 to tests/fixtures/enrichment-resolver.lock.json and replays a shared
 // production-row fixture through it, so either side drifting fails its own PR gate.
 
-const GROUNDED_IN_LABELS = {
-  site: 'vendor website',
-  both: 'vendor website and listing data',
-  listing: 'listing data',
-  directory: 'listing data',
-};
+// Z1 (GEN59, CHAT blob 053f2e83) -- THE PUBLIC SOURCE CLAUSE IS A CLOSED VOCABULARY.
+// `extraction_grounded_in` is the ONLY column the public grounding label may consult, and it
+// is consulted as a KEY, never as text. A value absent from this map renders NO source clause
+// at all -- not passed through, not truncated, not sanitised. That is why this is a Map with
+// an explicit lookup and not an object literal with `||` fallthrough: an object literal
+// answers for keys nobody wrote (`constructor`, `toString`), and the `||` fallthrough is
+// precisely the branch that turned a stored string into public copy.
+//
+// WHAT REACHES IT TODAY -- corpus-wide over the 6,050-row servable enriched cohort, read from
+// D1 7a06fa73 on 2026-09-09, not sampled: 'both' 2,681, 'site' 2,045, 'serper' 1,026, 'none'
+// 120, plus 178 rows each holding a UNIQUE whole extraction-rationale SENTENCE (5,872 + 178
+// = 6,050). Only the first two are source names, so only those two render a clause. `serper`
+// is a scraping vendor and is not named to a public reader (Z1.3); `none` says nothing
+// (Z1.3); a rationale sentence is internal reasoning, not a citation (Z1.2).
+const GROUNDED_IN_LABELS = new Map([
+  ['site', 'vendor website'],
+  ['both', 'vendor website and listing data'],
+  ['listing', 'listing data'],
+  ['directory', 'listing data'],
+]);
+
+// The same closure on the confidence clause. `extraction_confidence` is a stored column that
+// renders verbatim into public copy -- the identical shape of defect Z1 names for
+// `provenance`. It holds only high/medium/low today (3,051 / 2,175 / 824 over the cohort);
+// this map keeps that true whatever a later writer puts in the column.
+const CONFIDENCE_LABELS = new Map([
+  ['high', 'high'],
+  ['medium', 'medium'],
+  ['low', 'low'],
+]);
 
 // enriched_services_tags / _certifications / _locations are stored as JSON array TEXT.
 // '[]' and '""' are the empty encodings that show up in the live table -- both must read
@@ -99,11 +123,18 @@ function legacyServicesTags(raw) {
  * the Apollo value does not. `founding_year_disagrees` reports it; 224 servable rows are in
  * that state today (healthware: enriched 1996 vs Apollo 1998).
  *
- * PROVENANCE SPARSITY IS NOT A GROUNDING DEFECT (blob 083b18fe, Q1). The generic
- * `provenance` column is NULL on 5,713 of the 5,715 enriched rows while
- * `extraction_grounded_in` is populated on all 5,715. A null `provenance` must NEVER be read
- * as "ungrounded" and must NEVER withhold enriched content -- it is surfaced when present
- * and silently yields to extraction_grounded_in when it is not.
+ * Z1 -- `provenance` IS NOT A DISPLAY FIELD AND NO LONGER LEAVES THIS FUNCTION (GEN59, CHAT
+ * blob 053f2e83). It is an internal operational column. Two rows of the enriched cohort hold
+ * internal prose in it today -- id 3724 a merge record, id 83589 an audit paragraph carrying
+ * a third party's personal email address and phone number -- and eight further rows outside
+ * the cohort hold the same kind of note, shielded only by the `!hasEnrichment` early return
+ * below. The earlier build PREFERRED this column for the public source clause, so both would
+ * have published verbatim to the provider page and through MCP. The fix is not an allowlist
+ * of values: the column is not public, so the display resolver does not carry it out at all.
+ * The column is UNCHANGED IN THE STORE -- this is a render rule, not a data change. The
+ * amendment it supersedes (blob 083b18fe, Q1: "a null provenance must never withhold enriched
+ * content") is satisfied a fortiori -- provenance now withholds nothing, because nothing
+ * reads it.
  *
  * SCOPE FENCE (blob 63fb4960, V1.2). Nothing here participates in sitemap admission,
  * meta-robots, or any indexing decision. It resolves display fields only.
@@ -139,7 +170,6 @@ function resolveEnrichedProfile(p = {}) {
       founding_year_disagrees: false,
       confidence: null,
       grounded_in: null,
-      provenance: null,
       has_enrichment: false,
     };
   }
@@ -162,16 +192,29 @@ function resolveEnrichedProfile(p = {}) {
     ),
     confidence: firstNonEmpty(p.extraction_confidence),
     grounded_in: firstNonEmpty(p.extraction_grounded_in),
-    provenance: firstNonEmpty(p.provenance),
     has_enrichment: true,
   };
 }
 
-/** Human label for the provenance/confidence line. Empty string when there is nothing to say. */
+/**
+ * Human label for the grounding line. Empty string when there is nothing to say.
+ *
+ * Z1 -- EVERY BYTE THIS FUNCTION CAN EMIT IS WRITTEN IN THIS FILE. It reads two stored
+ * columns and uses BOTH only as map keys, so the set of strings it can return is finite and
+ * enumerable from source, and contains no stored text: the twelve combinations of
+ * {high, medium, low} x {vendor website, vendor website and listing data, listing data},
+ * those three confidence clauses alone, those three source clauses alone, and ''. There is no
+ * path by which a value out of the database becomes public copy. That is the property the
+ * corpus scan asserts, and it is the property an allowlist of stored VALUES would not give:
+ * an allowlist makes the public surface depend on what a column happens to contain, and this
+ * does not depend on the column's contents at all.
+ */
 function enrichmentGroundingLabel(e) {
+  const key = v => (v === null || v === undefined ? '' : String(v).trim().toLowerCase());
   const parts = [];
-  if (e.confidence) parts.push(`${e.confidence} confidence`);
-  const src = e.provenance || (e.grounded_in ? (GROUNDED_IN_LABELS[String(e.grounded_in).toLowerCase()] || e.grounded_in) : null);
+  const conf = CONFIDENCE_LABELS.get(key(e.confidence));
+  if (conf) parts.push(`${conf} confidence`);
+  const src = GROUNDED_IN_LABELS.get(key(e.grounded_in));
   if (src) parts.push(`sourced from ${src}`);
   return parts.join(', ');
 }

@@ -165,8 +165,8 @@ test('Y2.3: agreeing years are not reported as a disagreement', () => {
 });
 
 test('Q1: a NULL provenance never withholds enriched content (5,713 of 5,715 rows)', () => {
-  // amendment 083b18fe Q1 -- provenance sparsity is not a grounding defect. The label falls
-  // through to extraction_grounded_in, which is populated on all 5,715.
+  // amendment 083b18fe Q1 -- provenance sparsity is not a grounding defect. The label is
+  // built from extraction_grounded_in, which is populated on all 6,050 cohort rows.
   const row = byId(27); // virtru-national-us, provenance NULL
   const e = resolveEnrichedProfile(row);
   assert.equal(row.provenance, null);
@@ -174,6 +174,80 @@ test('Q1: a NULL provenance never withholds enriched content (5,713 of 5,715 row
   assert.ok(e.description && e.description.length > 0);
   assert.ok(enrichmentGroundingLabel(e).includes('sourced from'),
     'a null provenance must still produce a grounding label from extraction_grounded_in');
+});
+
+// --- Z1 (GEN59, CHAT blob 053f2e83): no stored string reaches the public label -----------
+
+test('Z1: the resolver does not carry `provenance` out at all', () => {
+  // Not "carries it out as null" -- the key is gone. `provenance` is an internal operational
+  // column and the display resolver is the display surface; a field that is not returned
+  // cannot be picked up by a later consumer that never read this ruling.
+  for (const id of [3724, 103379, 27, 29]) {
+    const e = resolveEnrichedProfile(byId(id));
+    assert.equal(Object.prototype.hasOwnProperty.call(e, 'provenance'), false,
+      `row ${id}: the resolver must not return a provenance field`);
+  }
+});
+
+test('Z1: id 3724 -- a provenance merge record never reaches the label', () => {
+  // omnimd-hawthorne-ny. provenance is a JSON merge/category-correction record; the previous
+  // build PREFERRED provenance for the source clause, so the whole JSON blob was the label.
+  const row = byId(3724);
+  assert.ok(row.provenance && row.provenance.includes('merged_from_id'),
+    'fixture drift: 3724 must still carry the merge-record provenance this test is about');
+  const label = enrichmentGroundingLabel(resolveEnrichedProfile(row));
+  assert.equal(label, 'high confidence, sourced from vendor website',
+    'the label must be built from extraction_grounded_in alone');
+  for (const fragment of ['merged_from_id', 'parent_company', 'Bryan ruling', '{', '}']) {
+    assert.ok(!label.includes(fragment), `internal provenance prose leaked: ${fragment}`);
+  }
+});
+
+test('Z1: an operational note carrying contact details cannot become public copy', () => {
+  // Shaped like the real id 83589 audit paragraph -- which is NOT committed here, because
+  // committing a third party's address to a public repo is the disclosure this ruling exists
+  // to prevent. The placeholder address is RFC 6761 `.invalid`; the assertion is structural.
+  const NOTE = 'self-submitted update via partners@ inbound email from redacted@example.invalid. ' +
+    'Identity link: sender phone (555) 010-0000 matches site contact page exactly.';
+  const row = { ...byId(27), provenance: NOTE, extraction_grounded_in: 'both', extraction_confidence: 'medium' };
+  const label = enrichmentGroundingLabel(resolveEnrichedProfile(row));
+  assert.equal(label, 'medium confidence, sourced from vendor website and listing data');
+  assert.ok(!/@/.test(label), 'no address-shaped text may reach the label');
+  assert.ok(!/\d{3}[).\s-]{0,2}\d{3}[.\s-]?\d{4}/.test(label), 'no phone-shaped text may reach the label');
+});
+
+test('Z1.2: a whole extraction-rationale SENTENCE renders no source clause (178 rows)', () => {
+  // id 357, linford-company-llp-denver-co. extraction_grounded_in is a 100+ char sentence of
+  // internal reasoning. Previously it fell through the map and rendered verbatim as a
+  // citation. 178 cohort rows are in this state, each with a UNIQUE sentence.
+  const row = byId(357);
+  assert.ok(row.extraction_grounded_in.length > 60, 'fixture drift: 357 must still hold a sentence');
+  const label = enrichmentGroundingLabel(resolveEnrichedProfile(row));
+  assert.equal(label, 'high confidence');
+  assert.ok(!label.includes('sourced from'), 'a rationale sentence is not a citation');
+});
+
+test('Z1.3: `serper` and `none` render no source clause (1,026 + 120 rows)', () => {
+  // id 25, vector-choice-national-us, extraction_grounded_in = 'serper'. A scraping vendor is
+  // not named to a public reader; `none` says nothing.
+  const serper = resolveEnrichedProfile(byId(25));
+  assert.equal(serper.grounded_in, 'serper');
+  assert.equal(enrichmentGroundingLabel(serper), 'low confidence');
+  const none = resolveEnrichedProfile({ ...byId(27), extraction_grounded_in: 'none' });
+  assert.equal(enrichmentGroundingLabel(none), 'high confidence');
+});
+
+test('Z1: the label vocabulary is closed -- arbitrary column contents emit nothing', () => {
+  // The corpus scan asserts today's values are all bare source names. THIS asserts the
+  // property that makes the scan durable: the label does not depend on the column contents.
+  const hostile = ['__proto__', 'constructor', 'toString', 'SITE ', ' Both', 'https://x.test/a',
+    'ops@example.invalid', '<script>alert(1)</script>', 'null', '', '   '];
+  for (const v of hostile) {
+    const label = enrichmentGroundingLabel(resolveEnrichedProfile(
+      { ...byId(27), extraction_grounded_in: v, extraction_confidence: v }));
+    assert.ok(['', 'sourced from vendor website', 'sourced from vendor website and listing data']
+      .includes(label), `unexpected label for grounded_in=${JSON.stringify(v)}: ${JSON.stringify(label)}`);
+  }
 });
 
 test('empty-array encodings read as absent, not as an empty section', () => {

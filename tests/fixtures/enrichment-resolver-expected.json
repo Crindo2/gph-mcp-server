@@ -32,7 +32,6 @@
       "founding_year_disagrees": false,
       "confidence": "high",
       "grounded_in": "both",
-      "provenance": null,
       "has_enrichment": true
     },
     "grounding_label": "high confidence, sourced from vendor website and listing data"
@@ -60,7 +59,6 @@
       "founding_year_disagrees": false,
       "confidence": "medium",
       "grounded_in": "both",
-      "provenance": null,
       "has_enrichment": true
     },
     "grounding_label": "medium confidence, sourced from vendor website and listing data"
@@ -92,10 +90,9 @@
       "founding_year_disagrees": false,
       "confidence": "low",
       "grounded_in": "serper",
-      "provenance": null,
       "has_enrichment": true
     },
-    "grounding_label": "low confidence, sourced from serper"
+    "grounding_label": "low confidence"
   },
   {
     "id": 27,
@@ -141,7 +138,6 @@
       "founding_year_disagrees": false,
       "confidence": "high",
       "grounded_in": "both",
-      "provenance": null,
       "has_enrichment": true
     },
     "grounding_label": "high confidence, sourced from vendor website and listing data"
@@ -170,7 +166,6 @@
       "founding_year_disagrees": false,
       "confidence": null,
       "grounded_in": null,
-      "provenance": null,
       "has_enrichment": false
     },
     "grounding_label": ""
@@ -212,10 +207,9 @@
       "founding_year_disagrees": false,
       "confidence": "high",
       "grounded_in": "The external IT auditors introduction and auditing services section explicitly enumerate SOC, HIPAA, HITRUST, FedRAMP, GovRAMP, NIST, CMMC, penetration testing, ISO, PCI DSS, and CSA-STAR services and name the listed certification standards.",
-      "provenance": null,
       "has_enrichment": true
     },
-    "grounding_label": "high confidence, sourced from The external IT auditors introduction and auditing services section explicitly enumerate SOC, HIPAA, HITRUST, FedRAMP, GovRAMP, NIST, CMMC, penetration testing, ISO, PCI DSS, and CSA-STAR services and name the listed certification standards."
+    "grounding_label": "high confidence"
   },
   {
     "id": 1522,
@@ -241,7 +235,6 @@
       "founding_year_disagrees": false,
       "confidence": "low",
       "grounded_in": "site",
-      "provenance": null,
       "has_enrichment": true
     },
     "grounding_label": "low confidence, sourced from vendor website"
@@ -269,7 +262,6 @@
       "founding_year_disagrees": false,
       "confidence": null,
       "grounded_in": null,
-      "provenance": null,
       "has_enrichment": false
     },
     "grounding_label": ""
@@ -303,10 +295,9 @@
       "founding_year_disagrees": false,
       "confidence": "high",
       "grounded_in": "site",
-      "provenance": "{\"parent_company\":\"Integrated Systems Management Inc.\",\"category_correction\":{\"from\":\"Credentialing Services\",\"to\":\"Medical Billing & RCM\",\"reason\":\"grounded enrichment lists EHR/medical billing/RCM/AI coding/denial management as core services; original Credentialing assignment was an extraction artifact from a credentialing-flavored web-search source\",\"date\":\"2026-06-12\",\"authority\":\"Bryan ruling 2026-06-12\",\"classification\":\"data correction, not part of any paid offer\"},\"merge\":{\"primary_id\":3724,\"merged_from_id\":9948,\"merged_from_slug\":\"integrated-systems-management-inc-omnimd-tarrytown-ny\",\"date\":\"2026-06-12\"}}",
       "has_enrichment": true
     },
-    "grounding_label": "high confidence, sourced from {\"parent_company\":\"Integrated Systems Management Inc.\",\"category_correction\":{\"from\":\"Credentialing Services\",\"to\":\"Medical Billing & RCM\",\"reason\":\"grounded enrichment lists EHR/medical billing/RCM/AI coding/denial management as core services; original Credentialing assignment was an extraction artifact from a credentialing-flavored web-search source\",\"date\":\"2026-06-12\",\"authority\":\"Bryan ruling 2026-06-12\",\"classification\":\"data correction, not part of any paid offer\"},\"merge\":{\"primary_id\":3724,\"merged_from_id\":9948,\"merged_from_slug\":\"integrated-systems-management-inc-omnimd-tarrytown-ny\",\"date\":\"2026-06-12\"}}"
+    "grounding_label": "high confidence, sourced from vendor website"
   },
   {
     "id": 8022,
@@ -341,7 +332,6 @@
       "founding_year_disagrees": true,
       "confidence": "high",
       "grounded_in": "both",
-      "provenance": null,
       "has_enrichment": true
     },
     "grounding_label": "high confidence, sourced from vendor website and listing data"
@@ -364,7 +354,6 @@
       "founding_year_disagrees": false,
       "confidence": null,
       "grounded_in": null,
-      "provenance": null,
       "has_enrichment": false
     },
     "grounding_label": ""
@@ -392,7 +381,6 @@
       "founding_year_disagrees": false,
       "confidence": null,
       "grounded_in": null,
-      "provenance": null,
       "has_enrichment": false
     },
     "grounding_label": ""
