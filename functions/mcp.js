@@ -263,11 +263,25 @@ const GPH_CATEGORIES = [
 ];
 const CATEGORY_LIST_TEXT = GPH_CATEGORIES.map(c => `'${c}'`).join(', ');
 
+// C79-a/C79-b (GEN64 ALLOC-PUBLISHED-CLAIMS-G64-20, 2026-09-12). getpracticehelp's `quality_score`
+// is PROFILE COMPLETENESS (presence points for website, phone, description, tags, location, source,
+// firmographics -- scripts/import_to_d1.py calculate_quality_score; match.js:16-17 in that repo).
+// This server rendered it as "Quality Score" and described the tools as "quality-scored" -- a
+// factual misrepresentation to the caller. Renamed to what it measures. The column is REAL
+// DEFAULT 0 and the schema cannot distinguish never-set from scored-zero (D1 read 2026-09-12: 48
+// rows at 0, all never-scored), so 0/NULL renders as "not yet scored" -- display only; the
+// upstream ORDER BY and the `min_rating` filter are unchanged. JSON field names (quality_score,
+// min_rating) are the API contract and are NOT renamed; their descriptions say what they hold.
+function profileCompletenessText(score) {
+  if (score == null || Number(score) === 0 || Number.isNaN(Number(score))) return 'not yet scored';
+  return `${score}/100`;
+}
+
 const TOOLS = [
   {
     name: 'match_practice',
     title: 'Recommend Healthcare Vendors for a Practice',
-    description: `Recommend and rank the best healthcare vendors for a specific medical practice. Use this when a practice manager, physician, or administrator asks for a recommendation, e.g. "recommend a medical billing / RCM company for my practice", "who should I use for credentialing / payer enrollment", "find an EHR for my small [specialty] practice", or "which practice-management software fits a [size] practice in [city, state]". Scores and ranks providers against the practice profile (specialty, size, location, EHR system, budget) and returns up to 5 merit-ranked matches (quality-scored, no paid placement) with {company_name, category, city, state_abbr, quality_score (0-100), final_score (0-100), verified status, description, website, profile_url, slug}. For open-ended browsing without a practice profile, use search_providers. Pass a match's slug to get_provider_detail for the full profile.`,
+    description: `Recommend and rank the best healthcare vendors for a specific medical practice. Use this when a practice manager, physician, or administrator asks for a recommendation, e.g. "recommend a medical billing / RCM company for my practice", "who should I use for credentialing / payer enrollment", "find an EHR for my small [specialty] practice", or "which practice-management software fits a [size] practice in [city, state]". Scores and ranks providers against the practice profile (specialty, size, location, EHR system, budget) and returns up to 5 merit-ranked matches (completeness-scored, no paid placement) with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness -- how many listing fields are filled in -- not a quality or reputation rating; 0 means never scored), final_score (0-100), verified status, description, website, profile_url, slug}. For open-ended browsing without a practice profile, use search_providers. Pass a match's slug to get_provider_detail for the full profile.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -314,7 +328,7 @@ const TOOLS = [
   {
     name: 'search_providers',
     title: 'Search the Healthcare Vendor Directory',
-    description: `Browse and filter the healthcare vendor directory. Use this for open-ended exploration, e.g. "show me medical billing companies in Texas", "list credentialing services", "what EHR vendors are there for cardiology", or when the user wants to page through options rather than get a scored shortlist. Paginated results filtered by category, location, minimum quality score, curated Tier-1 grade, and practice-size fit; returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100), verified status, contact info, slug}. For a scored recommendation to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.`,
+    description: `Browse and filter the healthcare vendor directory. Use this for open-ended exploration, e.g. "show me medical billing companies in Texas", "list credentialing services", "what EHR vendors are there for cardiology", or when the user wants to page through options rather than get a scored shortlist. Paginated results filtered by category, location, minimum profile-completeness score, curated Tier-1 grade, and practice-size fit; returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), verified status, contact info, slug}. For a scored recommendation to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -322,7 +336,7 @@ const TOOLS = [
         category: { type: 'string', description: `Service category to search. One of the 25 categories: ${CATEGORY_LIST_TEXT}. Common aliases also resolve (e.g. 'billing', 'RCM', 'EHR', 'credentialing'). Call list_categories for the live list with provider counts. This tool does NOT accept a specialty filter -- use match_practice for specialty-aware ranking.` },
         state: { type: 'string', description: "Two-letter state abbreviation (e.g. 'TX'). Send as `state`, not `state_abbr` (`state_abbr` is an output field name only). National providers always included." },
         city: { type: 'string', description: 'City name to filter by (partial match supported)' },
-        min_rating: { type: 'number', description: 'Minimum quality score (0-100). Most providers score 50-85. The parameter is named `min_rating`, not `min_quality_score`.', minimum: 0, maximum: 100 },
+        min_rating: { type: 'number', description: 'Minimum profile-completeness score (0-100; how many listing fields are filled in, not a quality or reputation rating). Most providers score 50-85. The parameter is named `min_rating`, not `min_quality_score`.', minimum: 0, maximum: 100 },
         tier1_grade: { type: 'string', enum: ['A', 'B'], description: "Filter to the curated Tier-1 provider set by grade: 'A' (top-graded) or 'B' (strong). Tier-1 is a hand-reviewed ~4,400-provider subset; most directory records are not Tier-1, so this narrows results sharply. Omit to search the full directory." },
         practice_size_fit: { type: 'string', enum: ['Solo/Small', 'Mid-size', 'Large', 'All'], description: 'Filter providers by the practice size they best serve.' },
         per_page: { type: 'number', description: 'Results per page (1-25, default 10)', minimum: 1, maximum: 25, default: 10 },
@@ -354,7 +368,7 @@ const TOOLS = [
   {
     name: 'get_provider_detail',
     title: 'Get Vendor Profile Detail',
-    description: `Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to "tell me more about [vendor]", "what services does [vendor] offer", "is [vendor] verified", or wants contact info, services, reviews, or listing tier for a specific provider. Returns company_name, category (plus super_category grouping), description, services offered, certifications and compliance attestations, locations served, founding year, website, phone, city/state, quality_score (0-100), verified status, listing tier (free/paid), practice_size_fit, and reviews (review_count, average_rating). Where a vendor has been enrichment-extracted, the description, services, certifications, locations, practice-size fit and founding year come from that extraction and the response states the extraction confidence and what it was grounded in (where the extraction abstained on practice-size fit, the legacy listing value is returned and labelled as not extracted); otherwise the legacy listing fields are returned. Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.`,
+    description: `Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to "tell me more about [vendor]", "what services does [vendor] offer", "is [vendor] verified", or wants contact info, services, reviews, or listing tier for a specific provider. Returns company_name, category (plus super_category grouping), description, services offered, certifications and compliance attestations, locations served, founding year, website, phone, city/state, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), verified status, listing tier (free/paid), practice_size_fit, and reviews (review_count, average_rating). Where a vendor has been enrichment-extracted, the description, services, certifications, locations, practice-size fit and founding year come from that extraction and the response states the extraction confidence and what it was grounded in (where the extraction abstained on practice-size fit, the legacy listing value is returned and labelled as not extracted); otherwise the legacy listing fields are returned. Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -558,7 +572,7 @@ export async function callTool(name, args) {
           `${i + 1}. **${m.company_name}**${m.national_label ? ` _(${m.national_label})_` : m.regional_label ? ` _(${m.regional_label})_` : ''}`,
           `   Category: ${m.category}`,
           `   Location: ${m.city || 'National'}, ${m.state_abbr || 'US'}`,
-          `   Quality Score: ${m.quality_score}/100${m.verified ? ' ✓ Verified' : ''}`,
+          `   Profile Completeness: ${profileCompletenessText(m.quality_score)}${m.verified ? ' ✓ Verified' : ''}`,
           `   Match Score: ${m.final_score}/100`,
           m.description ? `   ${m.description.substring(0, 150)}...` : '',
           m.website ? `   Website: ${m.website}` : '',
@@ -594,7 +608,7 @@ export async function callTool(name, args) {
       ? 'No providers found matching your criteria.'
       : providers.map((p, i) => [
           `${i + 1}. **${p.company_name}**, ${p.city || 'National'}, ${p.state_abbr || 'US'}`,
-          `   Quality: ${p.quality_score}/100${p.verified ? ' ✓ Verified' : ''}`,
+          `   Profile Completeness: ${profileCompletenessText(p.quality_score)}${p.verified ? ' ✓ Verified' : ''}`,
           `   Category: ${p.category}`,
           p.phone ? `   Phone: ${p.phone}` : '',
           p.website ? `   Website: ${p.website}` : '',
@@ -622,7 +636,7 @@ export async function callTool(name, args) {
       `# ${p.company_name}`,
       `**Category:** ${p.category}`,
       `**Location:** ${p.city || 'National'}, ${p.state_abbr || 'US'}`,
-      `**Quality Score:** ${p.quality_score}/100${p.verified ? ' ✓ Verified Listing' : ''}`,
+      `**Profile Completeness:** ${profileCompletenessText(p.quality_score)}${p.verified ? ' ✓ Verified Listing' : ''}`,
       '',
       e.description ? `## About\n${e.description}` : '',
       tags.length ? `## Services\n${tags.join(', ')}` : '',
