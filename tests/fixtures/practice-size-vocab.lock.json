@@ -1,0 +1,26 @@
+{
+  "contract": "PRACTICE-SIZE-VOCAB-V1",
+  "why": "The practice-size vocabulary (the ONE closed set and the projection of practice_size_fit and enriched_practice_size_fit onto it) is duplicated across Crindo2/getpracticehelp and Crindo2/gph-mcp-server at functions/_shared/practice-size-vocab.js because the two repos do not share a module. Both repos hash their own sentinel-delimited block against this lock, so either side drifting fails its own PR gate -- the same mechanism that holds ENRICHMENT-RESOLVER-V2 identical.",
+  "authority": "C77-c (CHAT-RULINGS-C76-TO-C81-C35-ADJUDICATED-2026-09-12), GPH-ENRICH-C1-VOCAB-PROVENANCE-01, ALLOC-ENRICH-C1-VOCAB-G64-18",
+  "block_sha256_lf": "6ed56d1deb4d015bfcc2f69b505413ae5ff94c595659f313959e69dcde839878",
+  "block_chars_lf": 10049,
+  "observed_source": "live Crindo2 gph-providers D1 (7a06fa73-938d-4ad7-8855-87f6806692ca), SELECT ... GROUP BY on both columns, counts only, read 2026-09-12",
+  "observed_legacy": {
+    "Solo/Small": 42783,
+    "Mid-size": 25369,
+    "All": 6081,
+    "Large": 2720,
+    "Small": 13,
+    "N/A": 11,
+    "NULL": 0
+  },
+  "observed_enriched": {
+    "NULL": 75475,
+    "All": 1087,
+    "Small": 309,
+    "Large": 84,
+    "Medium": 14,
+    "Solo": 8
+  },
+  "updated": "2026-09-12"
+}
