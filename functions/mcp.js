@@ -226,6 +226,9 @@ function enrichmentGroundingLabel(e) {
 // no-regression signal and not P2 evidence. Cloudflare Pages routes only the onRequest*
 // handlers, so an extra named export from a Functions module is inert at runtime.
 export { resolveEnrichedProfile, enrichmentGroundingLabel, parseJsonList, legacyServicesTags };
+// C50: callTool is exported (inert at runtime, same reasoning as above) so
+// tests/practice-size-fit-provenance.test.mjs can exercise the real get_provider_detail
+// render path against a mocked fetch rather than a copy of it.
 
 const SERVER_INFO = {
   protocolVersion: '2024-11-05',
@@ -351,7 +354,7 @@ const TOOLS = [
   {
     name: 'get_provider_detail',
     title: 'Get Vendor Profile Detail',
-    description: `Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to "tell me more about [vendor]", "what services does [vendor] offer", "is [vendor] verified", or wants contact info, services, reviews, or listing tier for a specific provider. Returns company_name, category (plus super_category grouping), description, services offered, certifications and compliance attestations, locations served, founding year, website, phone, city/state, quality_score (0-100), verified status, listing tier (free/paid), practice_size_fit, and reviews (review_count, average_rating). Where a vendor has been enrichment-extracted, the description, services, certifications, locations, practice-size fit and founding year come from that extraction and the response states the extraction confidence and what it was grounded in; otherwise the legacy listing fields are returned. Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.`,
+    description: `Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to "tell me more about [vendor]", "what services does [vendor] offer", "is [vendor] verified", or wants contact info, services, reviews, or listing tier for a specific provider. Returns company_name, category (plus super_category grouping), description, services offered, certifications and compliance attestations, locations served, founding year, website, phone, city/state, quality_score (0-100), verified status, listing tier (free/paid), practice_size_fit, and reviews (review_count, average_rating). Where a vendor has been enrichment-extracted, the description, services, certifications, locations, practice-size fit and founding year come from that extraction and the response states the extraction confidence and what it was grounded in (where the extraction abstained on practice-size fit, the legacy listing value is returned and labelled as not extracted); otherwise the legacy listing fields are returned. Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -523,7 +526,7 @@ export function validateArgs(toolName, args) {
   return null;
 }
 
-async function callTool(name, args) {
+export async function callTool(name, args) {
   if (name === 'list_categories') {
     const res = await fetch(`${API_BASE}/categories`);
     const data = await res.json().catch(() => ({}));
@@ -631,7 +634,20 @@ async function callTool(name, args) {
       // disagree, this is already the enriched one.
       e.has_enrichment && e.certifications.length ? `## Certifications & Compliance\n${e.certifications.join(', ')}` : '',
       e.has_enrichment && e.locations.length ? `## Locations Served\n${e.locations.join(', ')}` : '',
-      `**Practice Size Fit:** ${e.practice_size_fit || 'All sizes'}`,
+      // C50 (GPH-PRACTICE-GRAPH-PSF-C50-01, T7): NEVER RENDER THE PROVENANCE CLAIM OVER A
+      // DISCARDED SOURCE. The resolver computes `practice_size_fit_source` and, before this
+      // change, nothing here read it: on an enriched row whose extractor ABSTAINED on size
+      // (enriched_description present, enriched_practice_size_fit NULL -- 4,661 rows on D1
+      // 7a06fa73, read 2026-09-11) the legacy value printed directly above the "extracted
+      // from public sources" line, attributing it to an extraction that refused to produce
+      // it -- the same class Y2.2 withholds apollo_founded_year for. The profile-level line
+      // is shared with grounded fields and stays; the size line names its own source on
+      // exactly has_enrichment && practice_size_fit_source === 'legacy'. The note is a
+      // closed string written in this file (Z1). Unenriched rows are unchanged (Y2.1).
+      `**Practice Size Fit:** ${e.practice_size_fit || 'All sizes'}${
+        e.has_enrichment && e.practice_size_fit_source === 'legacy'
+          ? ' (legacy listing value, not extracted from public sources)'
+          : ''}`,
       e.has_enrichment && e.founding_year ? `**Founded:** ${e.founding_year}` : '',
       p.phone ? `**Phone:** ${p.phone}` : '',
       p.website ? `**Website:** ${p.website}` : '',
