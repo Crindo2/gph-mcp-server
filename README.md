@@ -9,7 +9,7 @@ The GPH Intelligence MCP server provides structured access to GetPracticeHelp's 
 ## Tools
 
 ### `match_practice`
-Find the best healthcare service vendors for a medical practice based on specialty, size, location, EHR system, and budget. Returns ranked matches with quality scores.
+Find the best healthcare service vendors for a medical practice based on specialty, size, location, EHR system, and budget. Returns ranked matches with profile-completeness scores.
 
 **Parameters:**
 - `category` (required) -- Service category (e.g. "Medical Billing & RCM", "Credentialing Services")
@@ -21,18 +21,18 @@ Find the best healthcare service vendors for a medical practice based on special
 - `budget_range` -- Monthly budget range
 
 ### `search_providers`
-Search the vendor directory by category, location, and quality rating. Returns paginated results.
+Search the vendor directory by category, location, and minimum profile-completeness score. Returns paginated results.
 
 **Parameters:**
 - `category` (required) -- Service category to search
 - `state` -- Two-letter state abbreviation
 - `city` -- City name filter
-- `min_rating` -- Minimum quality score (0-100)
+- `min_rating` -- Minimum profile-completeness score (0-100; not a quality rating)
 - `per_page` -- Results per page (default 10, max 25)
 - `page` -- Page number
 
 ### `get_provider_detail`
-Get the full profile for a specific vendor including description, services, contact information, and quality score.
+Get the full profile for a specific vendor including description, services, contact information, and profile-completeness score.
 
 **Parameters:**
 - `slug` (required) -- Vendor slug identifier (e.g. "ams-solutions-inc-dallas-tx")
@@ -63,7 +63,7 @@ No API key required.
 - **76,000+** curated healthcare service vendors
 - **25** service categories across 6 super-categories
 - **All 50 states** + DC
-- **Quality scores** based on Google ratings, review volume, and verification status
+- **Profile-completeness scores** (0-100) based on how many listing fields are filled in (website, phone, description, services, location, source, firmographics). Not a quality or reputation rating; 0 means the row was never scored
 - Monthly data refreshes
 
 ## Categories
