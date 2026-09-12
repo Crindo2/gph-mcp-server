@@ -4,6 +4,14 @@
  * Proxies to live GPH API at getpracticehelp.com
  */
 
+// C77-c (GPH-ENRICH-C1-VOCAB-PROVENANCE-01): the ONE closed practice-size vocabulary and the
+// projection of both stored columns onto it. Byte-identical to Crindo2/getpracticehelp
+// functions/_shared/practice-size-vocab.js (PRACTICE-SIZE-VOCAB-V1, pinned by
+// tests/fixtures/practice-size-vocab.lock.json in both repos). The search_providers and
+// match_practice enums and the get_provider_detail size line read it; /api/search and
+// /api/match read the other copy, so what this server advertises is what the API filters on.
+import { PRACTICE_SIZE_VOCAB, projectStoredSize, practiceSizeLabel } from './_shared/practice-size-vocab.js';
+
 const API_BASE = 'https://www.getpracticehelp.com/api';
 const AT_BASE = 'appvHqDMSu6aCwNxA';
 const AT_LOG_TABLE = 'tbl5ae8t1PbK2AMkx';
@@ -277,7 +285,7 @@ function profileCompletenessText(score) {
   return `${score}/100`;
 }
 
-const TOOLS = [
+export const TOOLS = [
   {
     name: 'match_practice',
     title: 'Recommend Healthcare Vendors for a Practice',
@@ -296,7 +304,8 @@ const TOOLS = [
         // descriptions that named a DIFFERENT noun than the parameter were measurably answered
         // with that noun -- `size` sent 31 times for practice_size, `state_abbr` 11 times for
         // state, `min_quality_score` for min_rating. Those args were silently dropped.
-        practice_size: { type: 'string', description: 'Size of the practice by provider count. The parameter is named `practice_size`, not `size`.', enum: ['Solo', 'Small', 'Mid-size', 'Large'] },
+        // C77-c: the closed vocabulary minus 'All' -- asking for "all sizes" is not a size.
+        practice_size: { type: 'string', description: 'Size of the practice by provider count. The parameter is named `practice_size`, not `size`.', enum: PRACTICE_SIZE_VOCAB.filter(v => v !== 'All') },
         city: { type: 'string', description: 'City where the practice is located. Send city and state separately, not as a combined `location` string.' },
         state: { type: 'string', description: "Two-letter state abbreviation (e.g. 'TX', 'CA', 'NY'). Send as `state`, not `state_abbr` (`state_abbr` is an output field name only)." },
         ehr_system: { type: 'string', description: "EHR system used by the practice (e.g. 'Epic', 'athenahealth', 'AdvancedMD', 'eClinicalWorks'). Helps score providers with compatible integrations higher." },
@@ -338,7 +347,10 @@ const TOOLS = [
         city: { type: 'string', description: 'City name to filter by (partial match supported)' },
         min_rating: { type: 'number', description: 'Minimum profile-completeness score (0-100; how many listing fields are filled in, not a quality or reputation rating). Most providers score 50-85. The parameter is named `min_rating`, not `min_quality_score`.', minimum: 0, maximum: 100 },
         tier1_grade: { type: 'string', enum: ['A', 'B'], description: "Filter to the curated Tier-1 provider set by grade: 'A' (top-graded) or 'B' (strong). Tier-1 is a hand-reviewed ~4,400-provider subset; most directory records are not Tier-1, so this narrows results sharply. Omit to search the full directory." },
-        practice_size_fit: { type: 'string', enum: ['Solo/Small', 'Mid-size', 'Large', 'All'], description: 'Filter providers by the practice size they best serve.' },
+        // C77-c: the enum IS the closed set (tests/practice-size-vocab-mcp.test.mjs asserts it).
+        // Before this it advertised the legacy column's tokens ('Solo/Small', 'Mid-size') while
+        // the extractor wrote 'Solo' / 'Small' / 'Medium' -- one enum meaning two things.
+        practice_size_fit: { type: 'string', enum: [...PRACTICE_SIZE_VOCAB], description: "Filter providers by the practice size they best serve, on the directory's one closed vocabulary: Solo, Small, Mid-size, Large, All. The filter reads the extracted size where one exists and the listing's stated fit otherwise; a listing stating 'Solo/Small' answers both Solo and Small. 'All' means the vendor serves every size -- on listings that were never extracted it is also the default, so it narrows results little." },
         per_page: { type: 'number', description: 'Results per page (1-25, default 10)', minimum: 1, maximum: 25, default: 10 },
         page: { type: 'number', description: 'Page number for pagination (default 1)', minimum: 1, default: 1 },
       },
@@ -632,6 +644,9 @@ export async function callTool(name, args) {
     const e = resolveEnrichedProfile(p);
     const tags = e.services_tags;
     const groundingLabel = enrichmentGroundingLabel(e);
+    // C77-c: project the resolver's OWN resolved value/source, so this line and the resolver
+    // can never disagree about which column the size came from.
+    const sizeLabel = practiceSizeLabel(projectStoredSize(e.practice_size_fit, e.practice_size_fit_source));
     const text = [
       `# ${p.company_name}`,
       `**Category:** ${p.category}`,
@@ -658,10 +673,22 @@ export async function callTool(name, args) {
       // is shared with grounded fields and stays; the size line names its own source on
       // exactly has_enrichment && practice_size_fit_source === 'legacy'. The note is a
       // closed string written in this file (Z1). Unenriched rows are unchanged (Y2.1).
-      `**Practice Size Fit:** ${e.practice_size_fit || 'All sizes'}${
-        e.has_enrichment && e.practice_size_fit_source === 'legacy'
-          ? ' (legacy listing value, not extracted from public sources)'
-          : ''}`,
+      // C77-b (GPH-ENRICH-C1-VOCAB-PROVENANCE-01): the literal 'All sizes' this line used to
+      // fall back to was a value belonging to NEITHER column -- an invented size printed
+      // exactly when the row asserted none. Gate: the line renders only when the resolved
+      // value projects onto the closed vocabulary (C77-c, practice-size-vocab.js), and when
+      // it does not -- both columns NULL/empty, or the unmappable legacy 'N/A' (11 rows) --
+      // NOTHING is emitted: the line is omitted, the same idiom every other optional line in
+      // this block already uses via .filter(Boolean). Not null, not "not stated": a model
+      // reading this profile must not be handed a token that looks like a data value. The
+      // label is the vocabulary's, so enriched 'Medium' renders 'Mid-size' and legacy
+      // 'Solo/Small' renders unchanged. The C50 source note on the abstained cohort stays.
+      sizeLabel
+        ? `**Practice Size Fit:** ${sizeLabel}${
+            e.has_enrichment && e.practice_size_fit_source === 'legacy'
+              ? ' (legacy listing value, not extracted from public sources)'
+              : ''}`
+        : '',
       e.has_enrichment && e.founding_year ? `**Founded:** ${e.founding_year}` : '',
       p.phone ? `**Phone:** ${p.phone}` : '',
       p.website ? `**Website:** ${p.website}` : '',
