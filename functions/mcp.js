@@ -854,7 +854,7 @@ function originHostOf(request) {
   try { return new URL(o).hostname.toLowerCase(); } catch { return ''; }
 }
 
-function assistantFromOrigin(host) {
+export function assistantFromOrigin(host) {
   if (!host) return null;
   for (const h in ASSISTANT_ORIGIN_HOSTS) {
     if (host === h || host.endsWith('.' + h)) return ASSISTANT_ORIGIN_HOSTS[h];
@@ -862,7 +862,7 @@ function assistantFromOrigin(host) {
   return null;
 }
 
-function assistantFromUA(ua) {
+export function assistantFromUA(ua) {
   if (!ua) return null;
   if (/chatgpt|openai/i.test(ua)) return 'chatgpt';
   if (/claude|anthropic/i.test(ua)) return 'claude';
@@ -876,7 +876,31 @@ function assistantChannel(ua, originHost) {
   return assistantFromOrigin(originHost) || assistantFromUA(ua);
 }
 
-function classifyCaller(ua, originHost) {
+// AGENT-INTERNAL-UA-01 (G61, ALLOC-MCP-ZEROCAT-CALLERCLASS-G61-001, 2026-09-10).
+//
+// Confirmed live defect: `openai-mcp/1.0.0 (Codex)` -- our own Codex-CLI coding-agent
+// harness, calling this endpoint directly to run diagnostics -- swept list_categories then
+// 5 categories in one minute (10:08-10:09) and every one of those 6 calls classed
+// organic_assistant. Cause: assistantFromUA's `/chatgpt|openai/i` test matches on the SDK
+// name inside the UA ("openai-mcp"), which our own dev-tool traffic shares with the actual
+// OpenAI/ChatGPT MCP client library -- enumeration got counted as organic assistant demand.
+//
+// The matcher was INCOMPLETE, not absent (self_test already exists for cbeg-* UAs -- see
+// below). This closes the same gap for the other agent SDKs we run against our own server:
+// Codex CLI and Claude Code both self-identify the underlying dev tool in a parenthetical
+// product suffix that the genuine end-user product traffic through the SAME client SDK does
+// not carry (a real ChatGPT-app MCP call presents as "openai-mcp/x.y.z" with no "(Codex)";
+// a real Claude.ai call is caught upstream by assistantFromOrigin's Origin-header check
+// before UA is even considered). Matching on that suffix -- not on the SDK/vendor name -- is
+// the discriminator: it is what keeps a genuine third-party assistant UA (bare "openai-mcp",
+// bare "claude", "anthropic") classing as organic_assistant while catching only the
+// self-identified internal harness traffic. See the discriminator test below.
+export function isInternalAgentUA(ua) {
+  const u = (ua || '');
+  return /\((?:codex|claude[\s-]?code)\)/i.test(u);
+}
+
+export function classifyCaller(ua, originHost) {
   if (assistantFromOrigin(originHost)) return 'organic_assistant';
   const u = (ua || '').trim();
   if (!u) return 'unknown';
@@ -887,6 +911,10 @@ function classifyCaller(ua, originHost) {
   // test -- it must not be hidden as self_test. It falls through to known_crawler
   // below, which the nightly rollup excludes from organic (honest, not organic).
   if (/^cbeg-/i.test(u)) return 'self_test';
+  // AGENT-INTERNAL-UA-01: must run BEFORE assistantFromUA below, or the SDK-name match
+  // there (openai/chatgpt/claude/anthropic) claims this UA first and mislabels it
+  // organic_assistant, which is the exact defect this rule closes.
+  if (isInternalAgentUA(u)) return 'agent_internal';
   if (assistantFromUA(u)) return 'organic_assistant';
   if (/bot\b|spider|crawl|chiark|slurp|bingpreview|facebookexternalhit|quality index|scraper|http-client|^curl|^wget|python-requests|python-httpx|\bhttpx\b|node-fetch|go-http-client|^axios|postman|insomnia/i.test(u)) return 'known_crawler';
   return 'unknown';
