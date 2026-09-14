@@ -506,6 +506,10 @@ function toolError(text) {
 }
 
 // Returns an error result, or null when the args are acceptable.
+// Exported for tests/caller-classification.test.mjs. Cloudflare Pages routes only the
+// onRequest* handlers, so an extra named export from a Functions module is inert at runtime.
+export { classifyCaller, callerIdentity, assistantChannel, agentSlug };
+
 // Exported for tests/arg-validate.test.mjs -- Cloudflare Pages routes only the onRequest*
 // handlers, so additional named exports from a Functions module are inert at runtime.
 export function validateArgs(toolName, args) {
@@ -887,9 +891,180 @@ function classifyCaller(ua, originHost) {
   // test -- it must not be hidden as self_test. It falls through to known_crawler
   // below, which the nightly rollup excludes from organic (honest, not organic).
   if (/^cbeg-/i.test(u)) return 'self_test';
+  // GEN62 CALLER-CLASSIFICATION-REPAIR. The documented AI *crawlers* (GPTBot, OAI-SearchBot,
+  // ClaudeBot, Claude-SearchBot, anthropic-ai, PerplexityBot, Google-Extended, ...) all carry
+  // a vendor name that `assistantFromUA` matches, so before this line a ClaudeBot index crawl
+  // returned 'organic_assistant' -- the one class the nightly rollup treats as organic demand.
+  // A crawler is not a person asking an assistant. This branch runs FIRST so the vendor-name
+  // test can never claim one. Zero rows in the production corpus are affected (read from D1
+  // e8605bbb 2026-09-11: no GPTBot / OAI-SearchBot / ClaudeBot / anthropic-ai row exists), so
+  // the legacy caller_class series is CONTINUOUS across this change on all traffic it has
+  // actually seen -- this is a forward-only correctness fix, not a redefinition.
+  if (AI_CRAWLER_UA.test(u)) return 'known_crawler';
   if (assistantFromUA(u)) return 'organic_assistant';
   if (/bot\b|spider|crawl|chiark|slurp|bingpreview|facebookexternalhit|quality index|scraper|http-client|^curl|^wget|python-requests|python-httpx|\bhttpx\b|node-fetch|go-http-client|^axios|postman|insomnia/i.test(u)) return 'known_crawler';
   return 'unknown';
+}
+
+// ============================================================================
+// CALLER IDENTITY (GEN62, AEO-MEASUREMENT-SPINE-BQ-01 / T3b-CALLER-CLASSIFICATION-REPAIR)
+//
+// THE DEFECT. `caller_class` above is a six-value enum that cannot answer the only question
+// a demand figure has to answer: WHO CALLED. Two failures, both measured against the whole
+// production corpus in D1 e8605bbb (mcp_usage_log, 3,922 rows, read 2026-09-11, not sampled):
+//
+//   1. `organic_assistant` -- the class whose name the nightly rollup reads as ORGANIC demand
+//      -- is 673 rows, and 664 of them (98.7%) are the OpenAI MCP client from ASN "Microsoft
+//      Limited"/"Microsoft Corporation": 433 carrying `openai-mcp/1.0.0 (Codex)`, i.e. the
+//      Codex DEVELOPER CLI, and 231 bare `openai-mcp/1.0.0`. Exactly 8 rows (`Claude-User`)
+//      are an end-user-initiated assistant fetch, and 1 is the literal test string
+//      `verify-fix-organic` (classed organic by its Origin header, not by its UA). A
+//      developer's agent harness and a person asking ChatGPT are not the same demand signal,
+//      and the enum could not tell them apart.
+//   2. There is NO HUMAN CLASS AT ALL. A real browser falls through every branch to
+//      'unknown'. All 7 rows carrying a genuine Chrome UA are 'unknown' -- alongside
+//      `SaSame-MCP-Audit/0.1` (112), `node` (92) and `undici` (50), which are bots. So
+//      'unknown' means "could be a person, could be a scanner", and no figure drawn from
+//      this log could state whether it measured people or machines. That is precisely why
+//      pageview-shaped counts off this surface got read as organic search traffic.
+//
+// THE REPAIR IS ADDITIVE AND FORWARD-ONLY. `caller_class` is NOT redefined: the nightly
+// rollup, `demand_rollup`, `generative_sweep_sessions` and the Airtable single-select all key
+// off its existing values, and silently changing what a value means mid-series is the same
+// defect in a new place. Three new recorded dimensions carry the honest split instead, and
+// tests/caller-classification.test.mjs pins legacy `caller_class` byte-for-byte against every
+// distinct user-agent the production corpus contains.
+//
+//   caller_kind   -- exhaustive, mutually exclusive, and the ONLY dimension a published
+//                    figure should be cut on: human | model_agent | bot | self_test |
+//                    unattributed. 'unattributed' is deliberately not called 'unknown': it
+//                    asserts that identity could not be established, NOT that a person may
+//                    be behind it.
+//   agent_intent  -- inside model_agent only: 'end_user' (a person asked an assistant and the
+//                    assistant called us -- ChatGPT-User, Claude-User, or a browser Origin on
+//                    an assistant host) vs 'dev_tool' (a developer's agent runtime -- Codex,
+//                    openai-mcp, Claude Code, Cursor, mcp-remote, an SDK). null otherwise.
+//   caller_agent  -- the normalized product token, so a row names its caller rather than
+//                    leaving the raw UA as the only handle.
+//
+// NETWORK-FREE AND DETERMINISTIC AT WRITE TIME, like everything above it: UA + Origin only,
+// no KV read, no lookup. The same three values are derivable from a stored row's user_agent,
+// which is what makes the 3,922 historical rows backfillable by the identical rules.
+//
+// WHAT THE WHOLE CORPUS SAYS ONCE CUT ON caller_kind: bot 3,065 / model_agent 672 (664
+// dev_tool, 8 end_user) / self_test 176 / human 7 / unattributed 2 = 3,922. Seven rows of
+// human traffic, and not one of them is organic search.
+// ============================================================================
+
+// Documented AI crawlers. These carry a model-vendor name but are index/training fetchers,
+// not a person and not an agent runtime acting for one.
+const AI_CRAWLER_UA = /\b(gptbot|oai-searchbot|claudebot|claude-searchbot|anthropic-ai|perplexitybot|google-extended|applebot-extended|ccbot|bytespider|amazonbot|meta-externalagent|cohere-ai|diffbot|timpibot|omgili|youbot|duckassistbot|petalbot)\b/i;
+
+// An assistant runtime calling because a PERSON asked it something.
+const END_USER_AGENT_UA = [
+  [/\bchatgpt-user\b/i,     'chatgpt-user',    'chatgpt'],
+  [/\bclaude-user\b/i,      'claude-user',     'claude'],
+  [/\bperplexity-user\b/i,  'perplexity-user', 'perplexity'],
+  [/\bgemini-user\b/i,      'gemini-user',     'gemini'],
+];
+
+// A DEVELOPER's agent runtime, IDE or SDK. Machine demand generated by whoever is building
+// against the server -- never an end user's question. Codex is matched before bare openai-mcp
+// because `openai-mcp/1.0.0 (Codex)` is 433 of the 664 openai-mcp rows and is the single
+// largest identified population in the whole log.
+const DEV_AGENT_UA = [
+  [/openai-mcp[^)]*\(\s*codex/i,              'openai-codex',   'chatgpt'],
+  [/\bcodex-cli\b/i,                          'openai-codex',   'chatgpt'],
+  [/\bopenai-mcp\b/i,                         'openai-mcp',     'chatgpt'],
+  [/\bclaude-code\b/i,                        'claude-code',    'claude'],
+  [/\bclaude-desktop\b/i,                     'claude-desktop', 'claude'],
+  [/\bmcp-remote\b/i,                         'mcp-remote',     null],
+  [/\bmcp-inspector\b|\bmodelcontextprotocol\b/i, 'mcp-inspector', null],
+  [/\bcursor\b/i,                             'cursor',         null],
+  [/\bwindsurf\b/i,                           'windsurf',       null],
+  [/\bcline\b/i,                              'cline',          null],
+  [/\bcopilot\b/i,                            'copilot',        'copilot'],
+  [/\bopenai-python\b|\bopenai-node\b/i,      'openai-sdk',     'chatgpt'],
+  [/\banthropic-python\b|\banthropic-sdk\b/i, 'anthropic-sdk',  'claude'],
+  [/\blangchain\b|\bllama-?index\b/i,         'llm-framework',  null],
+];
+
+// A real browser announces Mozilla/5.0 AND a versioned engine token. The two probe UAs in the
+// corpus -- `Mozilla/5.0 (research probe; MCP security measurement study; ...)` (102 rows) and
+// `Mozilla/5.0 (compatible; mcp-schema-probe/0.1)` (8 rows) -- carry the prefix and NO engine
+// token, which is exactly why both halves are required: a Mozilla/5.0 prefix alone is a
+// costless string any scanner can copy, and treating it as proof of a person is how a bot
+// count becomes a pageview count.
+const BROWSER_PREFIX_UA = /^mozilla\/5\.0\b/i;
+const BROWSER_ENGINE_UA = /\b(chrome|crios|safari|firefox|fxios|edg|edge|edga|edgios|opr|opera|trident|gecko)\/[\d.]+/i;
+
+const MONITOR_UA = /probe|listability|uptime|pingdom|healthcheck|statuscake|\bmonitor\b|uptimerobot|newrelic|datadog/i;
+const GENERIC_CLIENT_UA = /bot\b|spider|crawl|chiark|slurp|bingpreview|facebookexternalhit|quality index|scraper|scanner|audit|collector|census|catalog|registry|toolrouter|\bstudy\b|\bprove\b|\bminer\b|\bgrader\b|\bsync\b|^curl|\bcurl\/|^wget|python-requests|python-httpx|\bhttpx\b|node-fetch|go-http-client|^axios|postman|insomnia|^node$|^node\/|undici|okhttp|java\/|libwww|guzzle|^got\b|apache-httpclient/i;
+
+// The first token of a UA, sanitised to a short lowercase slug -- so even an unrecognised
+// caller is NAMEABLE in a report instead of being an anonymous bucket.
+function agentSlug(ua) {
+  const head = String(ua || '').trim().split(/[\s;()]/)[0].split('/')[0];
+  const slug = head.toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 40);
+  return slug || null;
+}
+
+function matchAgentTable(table, ua) {
+  if (!ua) return null;
+  for (const row of table) if (row[0].test(ua)) return row;
+  return null;
+}
+
+/**
+ * The honest caller split. Returns the legacy `caller_class` and `assistant_channel`
+ * UNCHANGED (so nothing downstream moves) plus the three new dimensions.
+ */
+function callerIdentity(ua, originHost) {
+  const u = String(ua == null ? '' : ua).trim();
+  const caller_class = classifyCaller(u, originHost);
+  const assistant_channel = assistantChannel(u, originHost);
+  const originAssistant = assistantFromOrigin(originHost);
+
+  let caller_kind = 'unattributed';
+  let agent_intent = null;
+  let caller_agent = null;
+
+  const endUserHit = matchAgentTable(END_USER_AGENT_UA, u);
+  const devHit = endUserHit ? null : matchAgentTable(DEV_AGENT_UA, u);
+
+  if (/^cbeg-/i.test(u)) {
+    caller_kind = 'self_test';
+    caller_agent = 'cbeg-harness';
+  } else if (AI_CRAWLER_UA.test(u)) {
+    caller_kind = 'bot';
+    caller_agent = agentSlug(u);
+  } else if (endUserHit) {
+    caller_kind = 'model_agent';
+    agent_intent = 'end_user';
+    caller_agent = endUserHit[1];
+  } else if (devHit) {
+    caller_kind = 'model_agent';
+    agent_intent = 'dev_tool';
+    caller_agent = devHit[1];
+  } else if (originAssistant) {
+    // A browser Origin on an assistant host: a person is in the assistant's own web surface,
+    // so the runtime is calling on a human's behalf. Checked AFTER the UA tables so a dev
+    // tool that happens to send an assistant Origin is still reported as a dev tool.
+    caller_kind = 'model_agent';
+    agent_intent = 'end_user';
+    caller_agent = originAssistant + '-web';
+  } else if (MONITOR_UA.test(u) || GENERIC_CLIENT_UA.test(u)) {
+    caller_kind = 'bot';
+    caller_agent = agentSlug(u);
+  } else if (BROWSER_PREFIX_UA.test(u) && BROWSER_ENGINE_UA.test(u)) {
+    caller_kind = 'human';
+    caller_agent = 'browser';
+  } else {
+    caller_kind = 'unattributed';
+    caller_agent = u ? agentSlug(u) : null;
+  }
+
+  return { caller_class, assistant_channel, caller_kind, agent_intent, caller_agent };
 }
 
 function funnelStep(tool) {
@@ -958,12 +1133,18 @@ async function buildTelemetry(server, request, env, toolName, args, resultsCount
   const rc = (typeof resultsCount === 'number') ? resultsCount : null;
   const zero = (step !== 'reference' && rc === 0) ? 1 : 0;
   const a = args || {};
+  const who = callerIdentity(ua, originHost);
   return {
     ts: new Date().toISOString(),
     server,
     tool: toolName || '',
-    caller_class: classifyCaller(ua, originHost),
-    assistant_channel: assistantChannel(ua, originHost),
+    caller_class: who.caller_class,
+    assistant_channel: who.assistant_channel,
+    // GEN62: the dimensions a published figure may be cut on. See callerIdentity above --
+    // caller_class is retained verbatim for series continuity, NOT because it is readable.
+    caller_kind: who.caller_kind,
+    agent_intent: who.agent_intent,
+    caller_agent: who.caller_agent,
     source: 'mcp',
     user_agent: ua,
     referer: request.headers.get('referer') || null,
@@ -1014,8 +1195,8 @@ async function writeTelemetryD1(env, rec) {
          zero_result, results_count, api_key_tier, category, specialty, city, state, ehr_system,
          treatment_type, insurance, search_term, demand_cell, vendor_surfaced, vendor_drilled, raw_args,
          practice_size, budget_range, practice_size_fit, field_completeness, country, referer,
-         asn, as_organization)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         asn, as_organization, caller_kind, agent_intent, caller_agent)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).bind(
       rec.ts, rec.server, rec.tool, rec.caller_class, rec.assistant_channel, rec.source, rec.user_agent,
       rec.session_id, rec.funnel_step, rec.zero_result, rec.results_count, rec.api_key_tier,
@@ -1023,7 +1204,8 @@ async function writeTelemetryD1(env, rec) {
       rec.treatment_type, rec.insurance, rec.search_term, rec.demand_cell,
       rec.vendor_surfaced, rec.vendor_drilled, rec.raw_args,
       rec.practice_size, rec.budget_range, rec.practice_size_fit, rec.field_completeness,
-      rec.country, rec.referer, rec.asn, rec.as_organization
+      rec.country, rec.referer, rec.asn, rec.as_organization,
+      rec.caller_kind, rec.agent_intent, rec.caller_agent
     ).run();
   } catch (e) {
     console.error('writeTelemetryD1: D1 telemetry write threw:', e && e.message);
@@ -1042,51 +1224,78 @@ function computeSignalScore(rec) {
 
 // Independent, non-blocking Airtable sink. Own try/catch; never throws. Surfaces auth/
 // schema failures so a dead write cannot go unseen again (the 2026-04-18 blind spot).
+// GEN62: the three caller-identity dimensions are written to Airtable as their OWN fields.
+// Airtable's `typecast` auto-creates a missing single-select OPTION but NOT a missing FIELD:
+// an unknown field name returns 422 UNKNOWN_FIELD_NAME and rejects the WHOLE record. Before
+// this stage that would have silently killed the Airtable mirror the moment the worker
+// deployed ahead of the schema. `airtableFields()` is therefore split into the stable core
+// and the GEN62 additions, and the writer retries ONCE with the core alone on 422 -- so
+// field-creation order is not load-bearing and a schema lag costs the new columns, never the
+// row. The retry is reported to the log, not swallowed.
+const GEN62_CALLER_FIELDS = ['Caller Kind', 'Agent Intent', 'Caller Agent'];
+
 async function logToolCall(env, rec, request) {
   const atKey = env?.AIRTABLE_PAT;
   if (!atKey) { console.error('logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped'); return; }
   let surfacedCount = 0;
   if (rec.vendor_surfaced) { try { surfacedCount = JSON.parse(rec.vendor_surfaced).length; } catch (e) {} }
+  const postFields = async (fields) => fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_LOG_TABLE}`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${atKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ records: [{ fields }], typecast: true }),
+  });
   try {
-    const res = await fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_LOG_TABLE}`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${atKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        records: [{ fields: {
-          'Tool Name': rec.tool,
-          'Category': rec.category || '',
-          'Specialty': rec.specialty || '',
-          'City': rec.city || '',
-          'State': rec.state || '',
-          'EHR System': rec.ehr_system || '',
-          'Results Count': rec.results_count || 0,
-          'Signal Score': computeSignalScore(rec),
-          'Timestamp': rec.ts,
-          'API Key': rec.api_key_tier || 'anonymous',
-          'User Agent': rec.user_agent || '',
-          'Source': rec.source || '',
-          'Caller Class': rec.caller_class,
-          ...(rec.assistant_channel ? { 'Assistant Channel': rec.assistant_channel } : {}),
-          'Session ID': rec.session_id || '',
-          'Funnel Step': rec.funnel_step || '',
-          'Zero Result': !!rec.zero_result,
-          'Raw Args': rec.raw_args || '',
-          'Demand Cell': rec.demand_cell || '',
-          'Vendor Drilled': rec.vendor_drilled || '',
-          'Vendor Surfaced Count': surfacedCount,
-          'Vendors Surfaced': rec.vendor_surfaced || '',
-          'Practice Size': rec.practice_size || '',
-          'Budget Range': rec.budget_range || '',
-          'Practice Size Fit': rec.practice_size_fit || '',
-          ...(typeof rec.field_completeness === 'number' ? { 'Field Completeness': rec.field_completeness } : {}),
-          'Country': (request && request.cf && request.cf.country) || '',
-          'Referer': (request && request.headers.get('referer')) || '',
-          ...(typeof rec.asn === 'number' ? { 'ASN': rec.asn } : {}),
-          'AS Organization': rec.as_organization || ''
-        }}],
-        typecast: true
-      })
-    });
+    const fields = {
+      'Tool Name': rec.tool,
+      'Category': rec.category || '',
+      'Specialty': rec.specialty || '',
+      'City': rec.city || '',
+      'State': rec.state || '',
+      'EHR System': rec.ehr_system || '',
+      'Results Count': rec.results_count || 0,
+      'Signal Score': computeSignalScore(rec),
+      'Timestamp': rec.ts,
+      'API Key': rec.api_key_tier || 'anonymous',
+      'User Agent': rec.user_agent || '',
+      'Source': rec.source || '',
+      'Caller Class': rec.caller_class,
+      ...(rec.assistant_channel ? { 'Assistant Channel': rec.assistant_channel } : {}),
+      'Session ID': rec.session_id || '',
+      'Funnel Step': rec.funnel_step || '',
+      'Zero Result': !!rec.zero_result,
+      'Raw Args': rec.raw_args || '',
+      'Demand Cell': rec.demand_cell || '',
+      'Vendor Drilled': rec.vendor_drilled || '',
+      'Vendor Surfaced Count': surfacedCount,
+      'Vendors Surfaced': rec.vendor_surfaced || '',
+      'Practice Size': rec.practice_size || '',
+      'Budget Range': rec.budget_range || '',
+      'Practice Size Fit': rec.practice_size_fit || '',
+      ...(typeof rec.field_completeness === 'number' ? { 'Field Completeness': rec.field_completeness } : {}),
+      'Country': (request && request.cf && request.cf.country) || '',
+      'Referer': (request && request.headers.get('referer')) || '',
+      ...(typeof rec.asn === 'number' ? { 'ASN': rec.asn } : {}),
+      'AS Organization': rec.as_organization || '',
+      // GEN62 caller-identity split. 'Caller Kind' is the dimension a published figure is
+      // cut on; 'Caller Class' beside it is the legacy enum, kept for series continuity.
+      'Caller Kind': rec.caller_kind || 'unattributed',
+      ...(rec.agent_intent ? { 'Agent Intent': rec.agent_intent } : {}),
+      'Caller Agent': rec.caller_agent || ''
+    };
+    let res = await postFields(fields);
+    if (res.status === 422) {
+      const detail = await res.text().catch(() => '');
+      if (detail.includes('UNKNOWN_FIELD_NAME')) {
+        console.error(`logToolCall: Airtable is missing the GEN62 caller fields (${GEN62_CALLER_FIELDS.join(', ')}); retrying without them. Add them to ${AT_LOG_TABLE} to restore the caller split in the mirror. D1 is unaffected.`);
+        const core = { ...fields };
+        for (const f of GEN62_CALLER_FIELDS) delete core[f];
+        res = await postFields(core);
+      } else {
+        console.error(`logToolCall: Airtable telemetry write failed 422 ${detail.slice(0, 200)}`);
+        await env?.CALL_METER?.put('telemetry_last_fail', new Date().toISOString(), { expirationTtl: 172800 }).catch(() => {});
+        return;
+      }
+    }
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
       console.error(`logToolCall: Airtable telemetry write failed ${res.status} ${detail.slice(0, 200)}`);
