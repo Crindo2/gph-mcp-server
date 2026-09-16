@@ -344,7 +344,7 @@ export const TOOLS = [
       properties: {
         category: { type: 'string', description: `Service category to search. One of the 25 categories: ${CATEGORY_LIST_TEXT}. Common aliases also resolve (e.g. 'billing', 'RCM', 'EHR', 'credentialing'). Call list_categories for the live list with provider counts. This tool does NOT accept a specialty filter -- use match_practice for specialty-aware ranking.` },
         state: { type: 'string', description: "Two-letter state abbreviation (e.g. 'TX'). Send as `state`, not `state_abbr` (`state_abbr` is an output field name only). National providers always included." },
-        city: { type: 'string', description: 'City name to filter by (partial match supported)' },
+        city: { type: 'string', description: "City to filter by. Matches one exact city only: the value is compared as a city slug (case and punctuation ignored, e.g. 'San Antonio' matches 'san-antonio'); partial names and prefixes do not match." },
         min_rating: { type: 'number', description: 'Minimum profile-completeness score (0-100; how many listing fields are filled in, not a quality or reputation rating). Most providers score 50-85. The parameter is named `min_rating`, not `min_quality_score`.', minimum: 0, maximum: 100 },
         tier1_grade: { type: 'string', enum: ['A', 'B'], description: "Filter to the curated Tier-1 provider set by grade: 'A' (top-graded) or 'B' (strong). Tier-1 is a hand-reviewed ~4,400-provider subset; most directory records are not Tier-1, so this narrows results sharply. Omit to search the full directory." },
         // C77-c: the enum IS the closed set (tests/practice-size-vocab-mcp.test.mjs asserts it).
@@ -380,7 +380,7 @@ export const TOOLS = [
   {
     name: 'get_provider_detail',
     title: 'Get Vendor Profile Detail',
-    description: `Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to "tell me more about [vendor]", "what services does [vendor] offer", "is [vendor] verified", or wants contact info, services, reviews, or listing tier for a specific provider. Returns company_name, category (plus super_category grouping), description, services offered, certifications and compliance attestations, locations served, founding year, website, phone, city/state, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), verified status, listing tier (free/paid), practice_size_fit, and reviews (review_count, average_rating). Where a vendor has been enrichment-extracted, the description, services, certifications, locations, practice-size fit and founding year come from that extraction and the response states the extraction confidence and what it was grounded in (where the extraction abstained on practice-size fit, the legacy listing value is returned and labelled as not extracted); otherwise the legacy listing fields are returned. Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.`,
+    description: `Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to "tell me more about [vendor]", "what services does [vendor] offer", "is [vendor] verified", or wants contact info or services for a specific provider. Returns company_name, category, city/state, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), verified status, description, services offered, practice_size_fit, phone and website where listed, Google rating and Google review count where present, and the profile URL. Where a vendor has been enrichment-extracted, the description, services and practice-size fit come from that extraction, the profile adds certifications and compliance attestations, locations served and founding year where extracted, and the response states the extraction confidence and what it was grounded in (where the extraction abstained on practice-size fit, the legacy listing value is returned and labelled as not extracted); otherwise the legacy listing fields are returned. Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -601,33 +601,10 @@ export async function callTool(name, args) {
   }
 
   if (name === 'search_providers') {
-    const params = new URLSearchParams();
-    if (args.category) params.set('category', args.category);
-    if (args.state) params.set('state', args.state);
-    if (args.city) params.set('city', args.city);
-    if (args.min_rating) params.set('min_rating', args.min_rating);
-    if (args.tier1_grade) params.set('tier1_grade', args.tier1_grade);
-    if (args.practice_size_fit) params.set('practice_size_fit', args.practice_size_fit);
-    params.set('per_page', Math.min(args.per_page || 10, ROW_CEILING));
-    params.set('page', args.page || 1);
-
-    const res = await fetch(`${API_BASE}/search?${params}`);
-    const data = await res.json();
-    if (!data.success) return { content: [{ type: 'text', text: `Search failed: ${data.error || 'Unknown error'}` }], isError: true };
-
-    const providers = data.providers || [];
-    const text = providers.length === 0
-      ? 'No providers found matching your criteria.'
-      : providers.map((p, i) => [
-          `${i + 1}. **${p.company_name}**, ${p.city || 'National'}, ${p.state_abbr || 'US'}`,
-          `   Profile Completeness: ${profileCompletenessText(p.quality_score)}${p.verified ? ' ✓ Verified' : ''}`,
-          `   Category: ${p.category}`,
-          p.phone ? `   Phone: ${p.phone}` : '',
-          p.website ? `   Website: ${p.website}` : '',
-        ].filter(Boolean).join('\n')).join('\n\n');
-
-    const totalResults = data.pagination?.total ?? data.total ?? providers.length;
-    return { content: [{ type: 'text', text: `${totalResults} total results (page ${args.page || 1}):\n\n${text}` }], count: totalResults, ids: { surfaced: providers.map(p => p.slug).filter(Boolean) } };
+    // Uncached path (no cache store passed). The served path in handleMcpRequest goes through
+    // serveTool(), which passes the read cache; both render through renderSearchResult().
+    const { data } = await fetchSearchData(args, {});
+    return renderSearchResult(args, data);
   }
 
   if (name === 'get_provider_detail') {
@@ -708,6 +685,176 @@ export async function callTool(name, args) {
   return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true };
 }
 
+// ── search_providers read cache (GPH-MCP-SERVING-01 M1-SERVING-BUILD; C161 s.2 as amended by
+//    C161-A) ──
+//
+// WHY. Before this, every search_providers call paid a full uncached subrequest to /api/search
+// (D1 COUNT + D1 page SELECT + D1 INSERT search_queries, Cache-Control no-store). Full-category
+// sweeps returned byte-identical pages and paid for every one of them each time. The public
+// directory is INTENTIONALLY enumerable (C161-A s.1), so the answer is to make a read cheap,
+// never to refuse or slow it: `count` is still returned, `page` is still uncapped, and a cache
+// hit returns exactly what the upstream returned for the same effective query.
+//
+// WHAT IS CACHED. The upstream /api/search JSON body for a successful response (success === true)
+// -- NOT the rendered tool result. Rendering runs on every call, so the text header's echoed page
+// number and any future render fix apply to cached data immediately. Failures and non-success
+// bodies are never stored.
+//
+// KEY. searchCacheKey(args): the EFFECTIVE query as /api/search computes it -- category and
+// practice_size_fit verbatim (their upstream resolvers are not mirrored here, so no folding is
+// assumed); state upper-cased and city slugified exactly as search.js does before binding;
+// tier1_grade upper-cased; min_rating as parseFloat and only when > 0; per_page and page as the
+// integers the upstream parses from what this server sends. Two argument sets share a key only
+// when the upstream would run the identical SQL with identical binds, so a hit can never answer
+// a different question. Keys are versioned (SEARCH_CACHE_NAME / origin path) so a code change to
+// the key or the stored shape invalidates by renaming.
+//
+// TTL AND FRESHNESS BOUND. SEARCH_CACHE_TTL_SECONDS = 3600. The GPH data sync ("Sync Airtable and
+// Deploy GPH") runs daily at 11:00 UTC plus on every push to main -- and its providers step is a
+// no-op: D1 `providers` is also written outside that workflow (enrichment and refresh lanes), so
+// there is no single sync event this server could subscribe to, and an invalidation hook would
+// miss writers. The bound is therefore the TTL, enforced BY CONSTRUCTION IN CODE: every stored
+// entry carries x-gph-cached-at, and a match older than the TTL (or with a missing, unparseable
+// or future timestamp) is treated as a miss and refetched, regardless of how long the platform
+// cache actually retains the object. Any D1 providers write, from any writer including the daily
+// sync, is visible to every caller within at most 1 hour -- 24x inside the daily sync cadence.
+//
+// STORE. The Workers Cache API (caches.open(SEARCH_CACHE_NAME)); functional for Pages Functions on
+// *.pages.dev. It is per data center and not tiered: a sweep from a new colo misses once per page.
+// No KV write cost, no D1 cost. If the store is unavailable or throws, the call is served uncached
+// (cache_status 'bypass') -- a cache fault can never fail or refuse a read.
+//
+// METERING AND TELEMETRY ON A HIT. Unchanged: checkAccess still meters every call before the
+// cache is consulted (the meter is an infrastructure safety valve, see RATE-CONTROL PURPOSE), and
+// telemetry still writes one row per call with cache_status 'hit' | 'miss' | 'bypass', so the hit
+// rate is measurable and call analytics stay whole. One upstream consequence, stated plainly: a hit
+// does not reach /api/search, so getpracticehelp's search_queries table no longer gets a row per
+// MCP call -- it gets one per cache miss. mcp_usage_log is the per-call record.
+export const SEARCH_CACHE_TTL_SECONDS = 3600;
+export const SEARCH_CACHE_NAME = 'gph-mcp-search-v1';
+const SEARCH_CACHE_KEY_BASE = 'https://search-cache.gph-mcp.invalid/v1/search';
+
+// The exact query string this server sends to /api/search (unchanged from the pre-cache code).
+export function searchUpstreamParams(args = {}) {
+  const params = new URLSearchParams();
+  if (args.category) params.set('category', args.category);
+  if (args.state) params.set('state', args.state);
+  if (args.city) params.set('city', args.city);
+  if (args.min_rating) params.set('min_rating', args.min_rating);
+  if (args.tier1_grade) params.set('tier1_grade', args.tier1_grade);
+  if (args.practice_size_fit) params.set('practice_size_fit', args.practice_size_fit);
+  params.set('per_page', Math.min(args.per_page || 10, ROW_CEILING));
+  params.set('page', args.page || 1);
+  return params;
+}
+
+// Normalized key over the effective upstream query. Mirrors Crindo2/getpracticehelp
+// functions/api/search.js parsing of the params searchUpstreamParams() sends.
+export function searchCacheKey(args = {}) {
+  const sent = searchUpstreamParams(args);
+  const eff = [];
+  const category = sent.get('category');
+  if (category) eff.push(['category', category]);
+  const state = sent.get('state');
+  if (state) eff.push(['state', state.toUpperCase()]);
+  const city = sent.get('city');
+  if (city) eff.push(['city', city.toLowerCase().replace(/[^a-z0-9]+/g, '-')]);
+  const minRating = parseFloat(sent.get('min_rating')) || 0;
+  if (minRating > 0) eff.push(['min_rating', String(minRating)]);
+  const grade = sent.get('tier1_grade');
+  if (grade) eff.push(['tier1_grade', grade.toUpperCase()]);
+  const size = sent.get('practice_size_fit');
+  if (size) eff.push(['practice_size_fit', size]);
+  // parseInt with NO radix, exactly as search.js: a hex string page ('0x10') is page 16 upstream (G78-41).
+  eff.push(['per_page', String(Math.min(50, Math.max(1, parseInt(sent.get('per_page')) || 20)))]);
+  eff.push(['page', String(Math.max(1, parseInt(sent.get('page')) || 1))]);
+  eff.sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0));
+  return `${SEARCH_CACHE_KEY_BASE}?${new URLSearchParams(eff)}`;
+}
+
+// Returns { data, cacheStatus } where cacheStatus is 'hit' | 'miss' | 'bypass'.
+// `cache` is a Cache-API-shaped store ({ match, put }) or null; `now` is epoch ms.
+export async function fetchSearchData(args = {}, { cache = null, now = Date.now(), waitUntil = null } = {}) {
+  let cacheStatus = cache ? 'miss' : 'bypass';
+  let keyRequest = null;
+  if (cache) {
+    try {
+      keyRequest = new Request(searchCacheKey(args));
+      const cached = await cache.match(keyRequest);
+      if (cached) {
+        const cachedAt = Number(cached.headers.get('x-gph-cached-at'));
+        const ageMs = now - cachedAt;
+        if (cached.headers.get('x-gph-cached-at') && Number.isFinite(cachedAt) && ageMs >= 0 && ageMs < SEARCH_CACHE_TTL_SECONDS * 1000) {
+          const data = await cached.json();
+          if (data && data.success === true) return { data, cacheStatus: 'hit' };
+        }
+      }
+    } catch (e) {
+      console.error('search cache read failed, serving uncached:', e && e.message);
+      cacheStatus = 'bypass';
+      keyRequest = null;
+    }
+  }
+
+  const res = await fetch(`${API_BASE}/search?${searchUpstreamParams(args)}`);
+  const data = await res.json();
+
+  if (keyRequest && data && data.success === true) {
+    const stored = new Response(JSON.stringify(data), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `public, max-age=${SEARCH_CACHE_TTL_SECONDS}`,
+        'x-gph-cached-at': String(now),
+      },
+    });
+    const put = Promise.resolve()
+      .then(() => cache.put(keyRequest, stored))
+      .catch(e => console.error('search cache write failed:', e && e.message));
+    if (typeof waitUntil === 'function') waitUntil(put); else await put;
+  }
+  return { data, cacheStatus };
+}
+
+export function renderSearchResult(args, data) {
+  if (!data.success) return { content: [{ type: 'text', text: `Search failed: ${data.error || 'Unknown error'}` }], isError: true };
+
+  const providers = data.providers || [];
+  const text = providers.length === 0
+    ? 'No providers found matching your criteria.'
+    : providers.map((p, i) => [
+        `${i + 1}. **${p.company_name}**, ${p.city || 'National'}, ${p.state_abbr || 'US'}`,
+        `   Profile Completeness: ${profileCompletenessText(p.quality_score)}${p.verified ? ' ✓ Verified' : ''}`,
+        `   Category: ${p.category}`,
+        p.phone ? `   Phone: ${p.phone}` : '',
+        p.website ? `   Website: ${p.website}` : '',
+      ].filter(Boolean).join('\n')).join('\n\n');
+
+  const totalResults = data.pagination?.total ?? data.total ?? providers.length;
+  return { content: [{ type: 'text', text: `${totalResults} total results (page ${args.page || 1}):\n\n${text}` }], count: totalResults, ids: { surfaced: providers.map(p => p.slug).filter(Boolean) } };
+}
+
+async function openSearchCache(env) {
+  // Test seam only: an object binding cannot be configured on Pages (env vars are strings).
+  if (env && env.__SEARCH_CACHE_FOR_TESTS) return env.__SEARCH_CACHE_FOR_TESTS;
+  try {
+    if (globalThis.caches && typeof globalThis.caches.open === 'function') return await globalThis.caches.open(SEARCH_CACHE_NAME);
+  } catch (e) {
+    console.error('search cache open failed, serving uncached:', e && e.message);
+  }
+  return null;
+}
+
+// The served path. Returns { result, cacheStatus }; cacheStatus is null for tools with no cache.
+// cacheStatus goes to telemetry only -- it is never added to the JSON-RPC result.
+export async function serveTool(name, args, { env = null, now = Date.now(), waitUntil = null } = {}) {
+  if (name === 'search_providers') {
+    const cache = await openSearchCache(env);
+    const { data, cacheStatus } = await fetchSearchData(args, { cache, now, waitUntil });
+    return { result: renderSearchResult(args, data), cacheStatus };
+  }
+  return { result: await callTool(name, args), cacheStatus: null };
+}
+
 // ── Prompt execution ──
 
 function getPrompt(name, args) {
@@ -733,6 +880,18 @@ function getPrompt(name, args) {
 //    retired. Rate cap 100 calls/IP/day (rolling daily). Per-call row ceiling 25. Legacy keys
 //    honored but not required. Bulk/unmetered -> /data-licensing/. (Supersedes Apr-2026 key-only posture.) ──
 
+// >>> RATE-CONTROL PURPOSE BEGIN >>>
+// RATE-CONTROL PURPOSE (C161-A s.3, owner ruling 2026-09-16). The public GPH vendor directory is
+// intentionally enumerable: anonymous agents may read every page of every category. Rate
+// controls in this server (the anonymous per-IP daily meter, the per-call row ceiling and the
+// legacy keyed quotas) exist ONLY for infrastructure safety, pathological traffic,
+// denial-of-service and resource exhaustion, and unexpected cost containment. They are NEVER an
+// anti-enumeration product boundary. A legitimate agent must remain able to ingest a complete
+// category. Do not add, re-key or tighten a control (ASN, organisation or category-level
+// throttle, page cap, hidden count) for the purpose of preventing or materially slowing
+// full-category ingestion. ASN and organisation may be recorded as telemetry only. Repeat reads
+// are made cheap by the search_providers read cache, not by refusing them.
+// <<< RATE-CONTROL PURPOSE END <<<
 const DAILY_LIMIT = 100;   // free-tier calls per IP per UTC day (rolling daily — no lifetime accumulation)
 const ROW_CEILING = 25;    // max rows returned per call; bulk/unmetered access -> data licensing
 const LICENSING_URL = 'https://www.getpracticehelp.com/data-licensing/';
@@ -771,6 +930,7 @@ async function checkAccess(env, apiKey, request) {
   // Free anonymous tier — 100 calls/IP/day (UTC), rolling daily, no lifetime cap.
   const meter = env?.CALL_METER;
   if (meter) {
+    // See RATE-CONTROL PURPOSE above: this meter is a safety valve, not an enumeration gate.
     const ip = request.headers.get('cf-connecting-ip') || 'unknown';
     const dayKey = `ip_daily:${ip}:${utcDay()}`;
     const count = parseInt(await meter.get(dayKey) || '0', 10);
@@ -900,6 +1060,48 @@ function funnelStep(tool) {
   return 'discover';
 }
 
+// ── traffic_class, classified at WRITE time (C161-A s.4a; GPH-MCP-SERVING-01 M1) ──
+//
+// C161-A s.4: a complete or near-complete sequential category traversal -- category-only, with no
+// drilldown or match behaviour -- is INGESTION / supply discovery, not practice DEMAND, and must not
+// inflate category-demand analytics. This column is ADDITIVE: demand_cell, results_count and every
+// other field are unchanged, and the raw row stays whole.
+//
+// RULE (a pure function of the call's own tool name and arguments):
+//   'demand'    -- get_provider_detail (individual-provider drilldown); match_practice (the match /
+//                  decision tool); search_providers carrying ANY contextual filter that the server
+//                  actually applies: state, city, min_rating > 0, tier1_grade, practice_size_fit.
+//   'ingestion' -- search_providers with category only (with or without page / per_page).
+//   'reference' -- list_categories (a lookup with no demand specification; mirrors funnel_step).
+//   null        -- any other tool name.
+//
+// WHAT THIS RULE CANNOT KNOW, stated plainly. One call cannot see a traversal. So:
+//   (1) a human-driven, category-only first look ("list credentialing services", page 1) is classed
+//       'ingestion' -- deliberately conservative, because the failure it prevents (sweeps inflating
+//       demand) is the measured one;
+//   (2) a sweep that adds a filter is classed 'demand' -- the 09-16 tier1_grade=A tail (G78-32
+//       addendum B) walked every page of PMC and Compliance and would write 'demand' here;
+//   (3) page coverage, sequence, concurrency across derived ids, repeat passes and user agent are
+//       NOT consulted (the UA is self-reported, and coverage needs a window).
+// Correcting (1) and (2) needs window-level evidence: that is the M3 backfill/reclassification,
+// not this stage. Nothing here throttles, refuses or alters any call -- it labels the row.
+const TRAFFIC_CLASS_CONTEXT_FILTERS = ['state', 'city', 'min_rating', 'tier1_grade', 'practice_size_fit'];
+
+export function classifyTrafficClass(tool, args) {
+  const a = args || {};
+  const applied = k => {
+    const v = a[k];
+    if (v == null || String(v).trim() === '') return false;
+    // search_providers forwards min_rating only when truthy and /api/search applies it only when > 0.
+    if (k === 'min_rating') return (parseFloat(v) || 0) > 0;
+    return true;
+  };
+  if (tool === 'list_categories') return 'reference';
+  if (tool === 'get_provider_detail' || tool === 'match_practice') return 'demand';
+  if (tool === 'search_providers') return TRAFFIC_CLASS_CONTEXT_FILTERS.some(applied) ? 'demand' : 'ingestion';
+  return null;
+}
+
 function demandCell(server, args) {
   const n = v => ((v == null ? '' : String(v)).trim().toLowerCase()) || '*';
   if (server === 'gth') return [n(args.treatment_type), n(args.state), n(args.city), n(args.insurance)].join('|');
@@ -951,7 +1153,7 @@ async function deriveSessionId(request, env) {
   return 'd:' + (await sha256hex(salt + '|' + ip + '|' + ua)).slice(0, 16);
 }
 
-async function buildTelemetry(server, request, env, toolName, args, resultsCount, tier, ids) {
+export async function buildTelemetry(server, request, env, toolName, args, resultsCount, tier, ids, cacheStatus = null) {
   const ua = request.headers.get('user-agent') || '';
   const originHost = originHostOf(request);
   const step = funnelStep(toolName);
@@ -1000,33 +1202,52 @@ async function buildTelemetry(server, request, env, toolName, args, resultsCount
     vendor_surfaced: (ids && ids.surfaced && ids.surfaced.length) ? JSON.stringify(ids.surfaced) : null,
     vendor_drilled: (ids && ids.drilled) ? ids.drilled : null,
     raw_args: JSON.stringify(a),
+    // GPH-MCP-SERVING-01 M1 (additive; migrations/2026_09_16_mcp_usage_log_traffic_class_cache_status.sql)
+    traffic_class: server === 'gph' ? classifyTrafficClass(toolName, a) : null,
+    cache_status: cacheStatus || null,
   };
 }
 
 // Independent, non-blocking D1 sink. Own try/catch; never throws to the caller.
+// The columns every deployed mcp_usage_log already has (the pre-M1 INSERT, same order).
+export const TELEMETRY_D1_BASE_COLUMNS = [
+  'ts', 'server', 'tool', 'caller_class', 'assistant_channel', 'source', 'user_agent', 'session_id', 'funnel_step',
+  'zero_result', 'results_count', 'api_key_tier', 'category', 'specialty', 'city', 'state', 'ehr_system',
+  'treatment_type', 'insurance', 'search_term', 'demand_cell', 'vendor_surfaced', 'vendor_drilled', 'raw_args',
+  'practice_size', 'budget_range', 'practice_size_fit', 'field_completeness', 'country', 'referer',
+  'asn', 'as_organization',
+];
+// Added by migrations/2026_09_16_mcp_usage_log_traffic_class_cache_status.sql (ADD COLUMN only).
+export const TELEMETRY_D1_M1_COLUMNS = ['traffic_class', 'cache_status'];
+
+function insertTelemetry(db, rec, columns) {
+  return db.prepare(
+    `INSERT INTO mcp_usage_log (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(',')})`
+  ).bind(...columns.map(c => (rec[c] === undefined ? null : rec[c]))).run();
+}
+
+// ORDERING SAFETY. main auto-deploys on merge and the migration is applied by hand. If this code
+// is live before the two columns exist, the extended INSERT fails with "no column named" -- and
+// without this fallback every D1 telemetry row would be lost until the migration landed. On exactly
+// that error the row is re-written with the pre-M1 column set, so deploy-before-migrate loses only
+// the two new labels, never the call record.
 async function writeTelemetryD1(env, rec) {
   const db = env && env.TELEMETRY_DB;
   if (!db) { console.error('writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped'); return; }
   try {
-    await db.prepare(
-      `INSERT INTO mcp_usage_log
-        (ts, server, tool, caller_class, assistant_channel, source, user_agent, session_id, funnel_step,
-         zero_result, results_count, api_key_tier, category, specialty, city, state, ehr_system,
-         treatment_type, insurance, search_term, demand_cell, vendor_surfaced, vendor_drilled, raw_args,
-         practice_size, budget_range, practice_size_fit, field_completeness, country, referer,
-         asn, as_organization)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
-    ).bind(
-      rec.ts, rec.server, rec.tool, rec.caller_class, rec.assistant_channel, rec.source, rec.user_agent,
-      rec.session_id, rec.funnel_step, rec.zero_result, rec.results_count, rec.api_key_tier,
-      rec.category, rec.specialty, rec.city, rec.state, rec.ehr_system,
-      rec.treatment_type, rec.insurance, rec.search_term, rec.demand_cell,
-      rec.vendor_surfaced, rec.vendor_drilled, rec.raw_args,
-      rec.practice_size, rec.budget_range, rec.practice_size_fit, rec.field_completeness,
-      rec.country, rec.referer, rec.asn, rec.as_organization
-    ).run();
+    await insertTelemetry(db, rec, [...TELEMETRY_D1_BASE_COLUMNS, ...TELEMETRY_D1_M1_COLUMNS]);
   } catch (e) {
-    console.error('writeTelemetryD1: D1 telemetry write threw:', e && e.message);
+    const msg = (e && e.message) || '';
+    if (/no column named|no such column/i.test(msg)) {
+      console.error('writeTelemetryD1: traffic_class/cache_status columns absent (migration not applied) -- writing pre-M1 row');
+      try {
+        await insertTelemetry(db, rec, TELEMETRY_D1_BASE_COLUMNS);
+      } catch (e2) {
+        console.error('writeTelemetryD1: D1 telemetry write threw:', e2 && e2.message);
+      }
+      return;
+    }
+    console.error('writeTelemetryD1: D1 telemetry write threw:', msg);
   }
 }
 
@@ -1100,7 +1321,8 @@ async function logToolCall(env, rec, request) {
 
 // ── Request router ──
 
-async function handleMcpRequest(body, env, apiKey, ctx) {
+// Exported for tests (inert at runtime: Pages routes only onRequest* handlers).
+export async function handleMcpRequest(body, env, apiKey, ctx) {
   const { jsonrpc: version, id, method, params } = body;
 
   if (version !== '2.0') return jsonrpcError(id, -32600, 'Invalid JSON-RPC version');
@@ -1127,13 +1349,21 @@ async function handleMcpRequest(body, env, apiKey, ctx) {
       // S3/S4: validate against the tool's own declared schema before serving. A rejection is
       // still telemetered (same row shape, results_count NULL -> zero_result stays 0, so a
       // rejection never masquerades as a genuine zero-result in the demand series).
-      const result = validateArgs(name, args || {}) || await callTool(name, args || {});
+      const rejection = validateArgs(name, args || {});
+      const waitUntil = (ctx && typeof ctx.waitUntil === 'function') ? p => ctx.waitUntil(p) : null;
+      const served = rejection
+        ? { result: rejection, cacheStatus: null }
+        : await serveTool(name, args || {}, { env, now: Date.now(), waitUntil });
+      const result = served.result;
 
       // Enriched demand telemetry -> two INDEPENDENT non-blocking sinks (Airtable mirror +
       // D1 durable). Each has its own try/catch inside; allSettled so one sink's failure
       // never skips the other, and neither blocks the tool response.
+      // M1: a cache hit is still one call and still one row; cache_status and traffic_class ride
+      // on the D1 row (the durable log of record). The Airtable mirror is unchanged: its POST
+      // names fields explicitly, and a field the table does not have rejects the whole record.
       const tier = validation.anonymous ? 'anonymous' : (validation.record?.plan || 'keyed');
-      const rec = await buildTelemetry('gph', ctx.request, env, name, args || {}, result.count, tier, result.ids);
+      const rec = await buildTelemetry('gph', ctx.request, env, name, args || {}, result.count, tier, result.ids, served.cacheStatus);
       const telemetry = Promise.allSettled([logToolCall(env, rec, ctx.request), writeTelemetryD1(env, rec)]);
       if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(telemetry); else await telemetry;
 
