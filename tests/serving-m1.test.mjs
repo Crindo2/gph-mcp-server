@@ -5,8 +5,9 @@
 //   2. Tool-description corrections, checked against the RENDERED get_provider_detail output.
 //   3. Rate-control purpose: identical text in code and RUNBOOK.md.
 //   4. traffic_class at write time, per call shape; D1 writer fallback before the migration.
-//   5. Enumeration: a synthetic full-category walk (mocked upstream) completes with no refusal
-//      below the existing infrastructure cap, `count` visible on every page.
+//   5. Enumeration: a synthetic full-category walk (mocked upstream) completes with no refusal,
+//      `count` visible on every page. The request-rate valve itself is tested in
+//      tests/rate-valve.test.mjs (GPH-MCP-RATE-VALVE-01).
 //
 //   node --test tests/serving-m1.test.mjs
 
@@ -14,6 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
+  resetRateValveIsolateStateForTests,
   TOOLS, callTool, handleMcpRequest, classifyTrafficClass, buildTelemetry,
   searchCacheKey, searchUpstreamParams, fetchSearchData, SEARCH_CACHE_TTL_SECONDS,
   TELEMETRY_D1_BASE_COLUMNS, TELEMETRY_D1_M1_COLUMNS,
@@ -106,8 +108,12 @@ function fakeRequest(ip = '203.0.113.7', ua = 'openai-mcp/1.0.0') {
   return { headers: h, cf: { country: 'US', asn: 8075, asOrganization: 'Microsoft Corporation' } };
 }
 
+// A fresh env is a fresh deployment: new isolate state, and a clock that advances 1.1 s per valve
+// check so the valve's once-per-second KV write gap never hides a count from these tests.
 function envWith({ cache = fakeCache(), db = fakeD1(), meter = fakeKV() } = {}) {
-  return { __SEARCH_CACHE_FOR_TESTS: cache, TELEMETRY_DB: db, CALL_METER: meter };
+  resetRateValveIsolateStateForTests();
+  let t = 1_800_000_000_000;
+  return { __SEARCH_CACHE_FOR_TESTS: cache, TELEMETRY_DB: db, CALL_METER: meter, __CLOCK_FOR_TESTS: () => (t += 1100) };
 }
 
 async function mcpCall(env, request, name, args, id = 1) {
@@ -326,7 +332,7 @@ test('cache via tools/call: a hit renders identically, still meters, still write
     assert.deepEqual(rows.map(r => r.cache_status), ['miss', 'hit']);
     assert.deepEqual(rows.map(r => r.traffic_class), ['ingestion', 'ingestion']);
     const meterKey = [...env.CALL_METER.m.keys()].find(k => k.startsWith('ip_daily:203.0.113.7:'));
-    assert.equal(env.CALL_METER.m.get(meterKey), '2', 'a hit still meters (safety valve unchanged)');
+    assert.equal(env.CALL_METER.m.get(meterKey), '2', 'a hit still meters (safety valve counts every call)');
   });
 });
 
@@ -432,17 +438,19 @@ test('rate-control purpose: the code comment and RUNBOOK.md carry the same text'
   const inRunbook = purposeBlock(runbook, '<!-- >>> RATE-CONTROL PURPOSE BEGIN >>> -->', '<!-- <<< RATE-CONTROL PURPOSE END <<< -->', l => l);
   assert.equal(inCode, inRunbook);
   for (const must of ['infrastructure safety', 'pathological traffic', 'denial-of-service', 'resource exhaustion',
-    'unexpected cost containment', 'NEVER an anti-enumeration product boundary', 'A legitimate agent must remain able to ingest a complete category']) {
+    'unexpected cost containment', 'NEVER an anti-enumeration product boundary', 'ingest the ENTIRE public provider corpus', 'limit request RATE, not the total read',
+    'full-corpus ingest from one egress at the permitted rate is never refused', 'Caching is the primary economic control']) {
     assert.ok(inCode.includes(must), `purpose text lacks "${must}"`);
   }
   // The purpose sits AT the metering code.
-  assert.ok(source.indexOf('// <<< RATE-CONTROL PURPOSE END <<<') < source.indexOf('const DAILY_LIMIT = 100;'));
-  assert.ok(source.indexOf('const DAILY_LIMIT = 100;') - source.indexOf('// <<< RATE-CONTROL PURPOSE END <<<') < 80);
+  assert.ok(source.indexOf('// <<< RATE-CONTROL PURPOSE END <<<') < source.indexOf('export const RATE_WINDOW_SECONDS = 60;'));
+  assert.ok(source.indexOf('export const RATE_WINDOW_SECONDS = 60;') - source.indexOf('// <<< RATE-CONTROL PURPOSE END <<<') < 80);
+  assert.ok(!/licens/i.test(inCode), 'purpose text carries no licensing pointer');
 });
 
 test('rate controls: no ASN, organisation or category keyed limiter was introduced', () => {
   const meterKeys = [...source.matchAll(/`([a-z_]+):\$\{/g)].map(m => m[1]);
-  assert.deepEqual([...new Set(meterKeys)].sort(), ['ip_daily', 'usage_retry'].sort(), `meter key prefixes: ${meterKeys}`);
+  assert.deepEqual([...new Set(meterKeys)].sort(), ['ip_daily', 'ip_rate', 'usage_retry'].sort(), `meter key prefixes: ${meterKeys}`);
   assert.ok(!/asn[^\n]*(limit|throttle|budget)|(limit|throttle|budget)[^\n]*\basn\b/i.test(source.replace(/\/\/[^\n]*/g, '')), 'no ASN-keyed control in code');
 });
 
@@ -512,8 +520,7 @@ test('migration: additive only (ADD COLUMN), both columns, marked not applied', 
 // ---------------------------------------------------------------- 5. enumeration
 
 test('enumeration: a full 142-page category walk completes with no refusal and count on every page', async () => {
-  // Lab: 3,536 providers / 25 = 142 pages. Two egress IPs (the real sweep fanned across 14-16),
-  // each well under the existing 100/IP/day infrastructure cap.
+  // Lab: 3,536 providers / 25 = 142 pages. Two egress IPs (the real sweep fanned across 14-16).
   const env = envWith();
   const up = mockUpstream({ total: 3536 });
   const seen = new Set();
@@ -542,16 +549,4 @@ test('enumeration: a full 142-page category walk completes with no refusal and c
   assert.equal(rows.length, 284, 'every call telemetered');
   assert.equal(rows.filter(r => r.cache_status === 'hit').length, 142);
   assert.ok(rows.every(r => r.traffic_class === 'ingestion'));
-});
-
-test('enumeration: from ONE IP, no refusal occurs below the existing 100/day cap (cap itself unchanged)', async () => {
-  const env = envWith();
-  await withFetch(mockUpstream().fetchFn, async () => {
-    for (let page = 1; page <= 100; page++) {
-      const r = await mcpCall(env, fakeRequest('192.0.2.9'), 'search_providers', { category: LAB, per_page: 25, page }, page);
-      assert.ok(!r.isError, `refused below cap at call ${page}`);
-    }
-    const over = await mcpCall(env, fakeRequest('192.0.2.9'), 'search_providers', { category: LAB, per_page: 25, page: 101 }, 101);
-    assert.ok(over.isError, 'the pre-existing infrastructure cap still applies at call 101');
-  });
 });

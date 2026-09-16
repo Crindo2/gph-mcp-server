@@ -17,7 +17,7 @@
 </head>
 <body>
   <h1>Privacy Policy</h1>
-  <p class="meta"><strong>GPH Intelligence MCP Server</strong> &middot; Last updated: 2026-06-24 &middot; Operated by CBEG Group LLC &middot; Contact: <a href="mailto:cbeggroup@gmail.com">cbeggroup@gmail.com</a></p>
+  <p class="meta"><strong>GPH Intelligence MCP Server</strong> &middot; Last updated: 2026-09-16 &middot; Operated by CBEG Group LLC &middot; Contact: <a href="mailto:cbeggroup@gmail.com">cbeggroup@gmail.com</a></p>
 
   <p>This policy describes how the GPH Intelligence MCP Server (<code>https://gph-mcp-server.pages.dev/mcp</code>) handles data. It covers the MCP service's data handling, not the contents of the underlying vendor directory.</p>
 
@@ -25,10 +25,10 @@
   <p>When you call a tool, we receive the name of the tool you called and the query parameters you supply &mdash; service category, medical specialty, practice size, city, state, EHR system, budget range, and search filters &mdash; together with the identifiers of the providers returned and any provider profile you open, a derived "signal score" (0&ndash;3, reflecting how complete the query is), the number of results returned, and a timestamp. We also record the user-agent string of the calling software and, where your client supplies one, the MCP session identifier. If you send a legacy API key, we record only its access tier (otherwise the call is logged as "anonymous"). We receive your IP address from the network connection and use it only (a) for rate limiting and (b) as a transient input to a daily-rotating, non-reversible session-correlation value; your raw IP address is never written to either store.</p>
 
   <h2>How we use it</h2>
-  <p>To operate the service and return results; to enforce rate limits (100 calls per IP per day); and to produce aggregate demand analytics &mdash; which categories, specialties, and locations practices ask about, and how that demand arrives &mdash; that help us improve the directory and prioritize vendor coverage.</p>
+  <p>To operate the service and return results; to enforce a request-rate safety valve (per-IP calls per minute, with a daily backstop); and to produce aggregate demand analytics &mdash; which categories, specialties, and locations practices ask about, and how that demand arrives &mdash; that help us improve the directory and prioritize vendor coverage.</p>
 
   <h2>Storage and processors</h2>
-  <p>Usage records are stored in Cloudflare D1 (our hosting provider's own database) and mirrored to Airtable (our data processor) for review. Each record holds the non-identifying call metadata described above &mdash; tool, query arguments, user-agent, and the derived session identifier &mdash; and does not contain your IP address or any account identity. Your IP address is held only as a per-day rate-limit counter in Cloudflare KV, which expires automatically after 48 hours.</p>
+  <p>Usage records are stored in Cloudflare D1 (our hosting provider's own database) and mirrored to Airtable (our data processor) for review. Each record holds the non-identifying call metadata described above &mdash; tool, query arguments, user-agent, and the derived session identifier &mdash; and does not contain your IP address or any account identity. Your IP address is held only as a key for rate-limit counters in Cloudflare KV: a per-minute counter, which expires automatically after 2 minutes, and a per-day counter, which expires automatically after 48 hours. The same counters are held briefly in the memory of the server instance handling your calls.</p>
 
   <h2>Retention</h2>
   <p>Individual usage records are retained for service-improvement analytics in Cloudflare D1 and Airtable for up to 24 months, after which they are deleted; aggregate, de-identified demand statistics derived from them may be kept indefinitely. Rate-limit counters expire automatically after 48 hours.</p>
