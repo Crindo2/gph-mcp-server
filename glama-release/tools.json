@@ -81,7 +81,7 @@
         },
         "city": {
           "type": "string",
-          "description": "City name to filter by (partial match supported)"
+          "description": "City to filter by. Matches one exact city only: the value is compared as a city slug (case and punctuation ignored, e.g. 'San Antonio' matches 'san-antonio'); partial names and prefixes do not match."
         },
         "min_rating": {
           "type": "number",
@@ -129,7 +129,7 @@
   {
     "name": "get_provider_detail",
     "title": "Get Provider Detail",
-    "description": "Get the full profile of one healthcare service provider identified by slug: company_name, category (plus super_category grouping), description, services_tags (comma-delimited list of services offered), website, phone, city/state, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), verified status, listing tier (free/paid), practice_size_fit, and reviews with review_count and average_rating. Slug comes from match_practice or search_providers results. Returns an error if the slug is unknown.",
+    "description": "Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to \"tell me more about [vendor]\", \"what services does [vendor] offer\", \"is [vendor] verified\", or wants contact info or services for a specific provider. Returns company_name, category, city/state, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), verified status, description, services offered, practice_size_fit, phone and website where listed, Google rating and Google review count where present, and the profile URL. Where a vendor has been enrichment-extracted, the description, services and practice-size fit come from that extraction, the profile adds certifications and compliance attestations, locations served and founding year where extracted, and the response states the extraction confidence and what it was grounded in (where the extraction abstained on practice-size fit, the legacy listing value is returned and labelled as not extracted); otherwise the legacy listing fields are returned. Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.",
     "annotations": {
       "readOnlyHint": true,
       "idempotentHint": true,
