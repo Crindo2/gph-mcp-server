@@ -88,14 +88,12 @@ Pharmacy & Medication Management, Laboratory & Diagnostics
 
 ## API Access
 
-Free: 100 calls per IP per day, no API key required.
-
-For bulk or unmetered access, license the dataset at [getpracticehelp.com/data-licensing/](https://www.getpracticehelp.com/data-licensing/)
+Free, no API key required. The full public directory may be read, including every page of every category. A per-IP request-rate safety valve (120 calls per 60 seconds, plus a daily backstop of 20,000 calls) protects the service. It limits rate, not total, so a full-directory read paced at 2 calls per second or less is never refused.
 
 ## Troubleshooting
 
 - **No results returned** -- broaden your query. `category` is required, so make sure it is set; then try removing the `city`/`min_rating` filters or widening the `state` (national providers are always included).
-- **HTTP 429 (rate limited)** -- the free tier allows 100 calls per IP per day, resetting at 00:00 UTC. For higher volume, license the dataset (see API Access above).
+- **"Rate limit exceeded"** -- more than 120 calls in 60 seconds from one IP, or 20,000 in one UTC day. The tool result has `isError: true` and a `retry_after_seconds` value. Wait that long and continue.
 - **Can't connect** -- point your client at the remote endpoint, no API key required:
   ```
   npx -y mcp-remote https://gph-mcp-server.pages.dev/mcp

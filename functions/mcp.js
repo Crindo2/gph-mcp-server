@@ -876,25 +876,138 @@ function getPrompt(name, args) {
   return null;
 }
 
-// ── Access control (2026-06-10): free distribution. Anonymous tools/call ENABLED; paid tiers
-//    retired. Rate cap 100 calls/IP/day (rolling daily). Per-call row ceiling 25. Legacy keys
-//    honored but not required. Bulk/unmetered -> /data-licensing/. (Supersedes Apr-2026 key-only posture.) ──
+// ── Access control: free distribution. Anonymous tools/call ENABLED, no key required; legacy keys
+//    honored but never required. Anonymous calls pass a per-IP REQUEST-RATE safety valve with a
+//    daily backstop sized above a full-corpus ingest (GPH-MCP-RATE-VALVE-01, C164 s.1(b)). Per-call
+//    row ceiling 25. ──
 
 // >>> RATE-CONTROL PURPOSE BEGIN >>>
-// RATE-CONTROL PURPOSE (C161-A s.3, owner ruling 2026-09-16). The public GPH vendor directory is
-// intentionally enumerable: anonymous agents may read every page of every category. Rate
-// controls in this server (the anonymous per-IP daily meter, the per-call row ceiling and the
-// legacy keyed quotas) exist ONLY for infrastructure safety, pathological traffic,
-// denial-of-service and resource exhaustion, and unexpected cost containment. They are NEVER an
-// anti-enumeration product boundary. A legitimate agent must remain able to ingest a complete
-// category. Do not add, re-key or tighten a control (ASN, organisation or category-level
-// throttle, page cap, hidden count) for the purpose of preventing or materially slowing
-// full-category ingestion. ASN and organisation may be recorded as telemetry only. Repeat reads
-// are made cheap by the search_providers read cache, not by refusing them.
+// RATE-CONTROL PURPOSE (C161-A s.3, owner ruling 2026-09-16, as corrected by C164 s.1(b)). The
+// public GPH vendor directory is intentionally enumerable: anonymous agents may read every page of
+// every category, and a legitimate agent may ingest the ENTIRE public provider corpus, not merely
+// one category. Rate controls in this server (the anonymous per-IP request-rate valve, its daily
+// backstop and the per-call row ceiling) exist ONLY for infrastructure safety, pathological
+// traffic, denial-of-service and resource exhaustion, and unexpected cost containment. They are
+// NEVER an anti-enumeration product boundary. They limit request RATE, not the total read: a
+// full-corpus ingest from one egress at the permitted rate is never refused, and the daily
+// backstop is sized above a full-corpus ingest with headroom. A refusal is operational only (rate
+// exceeded, retry after N seconds) and never points to paid access. Do not add, re-key or tighten
+// a control (ASN, organisation or category-level throttle, total cap below a full-corpus ingest,
+// page cap, hidden count) for the purpose of preventing or materially slowing full-corpus
+// ingestion. ASN and organisation may be recorded as telemetry only. Caching is the primary
+// economic control: repeat reads are made cheap by the search_providers read cache, not by
+// refusing them.
 // <<< RATE-CONTROL PURPOSE END <<<
-const DAILY_LIMIT = 100;   // free-tier calls per IP per UTC day (rolling daily — no lifetime accumulation)
-const ROW_CEILING = 25;    // max rows returned per call; bulk/unmetered access -> data licensing
-const LICENSING_URL = 'https://www.getpracticehelp.com/data-licensing/';
+export const RATE_WINDOW_SECONDS = 60;     // fixed request-rate window per IP
+export const RATE_LIMIT_PER_WINDOW = 120;  // anonymous calls per IP per window (2 calls/s sustained)
+export const DAILY_BACKSTOP = 20000;       // DoS/cost backstop per IP per UTC day; > 6x a full-corpus ingest
+const ROW_CEILING = 25;                    // max rows per call; transport sizing only (count and page stay open)
+
+// SIZING (measured 2026-09-16; arithmetic restated in RUNBOOK.md and tests/rate-valve.test.mjs).
+//   Corpus: /api/categories = 25 categories, 74,993 providers. Category-only pages at 25/page,
+//     summed per category = 3,010 pages (largest: Healthcare Legal Services 7,380 = 296 pages).
+//     A full-corpus ingest = 3,010 search_providers calls + 1 list_categories = 3,011 calls.
+//   Time at the valve: 3,011 / 120 per minute = 25.1 minutes minimum from ONE egress; at a gentler
+//     1 call/s, 50.2 minutes. Old 100/IP/day cap: 31 days for the same walk.
+//   Per-call cost (uncached miss): 1 Pages Function + 1 /api/search Function (D1 COUNT + page SELECT
+//     + INSERT search_queries) + 1 D1 telemetry INSERT + 1 Airtable POST + KV get/put. Live latency
+//     1.34 s miss, 0.47 / 0.43 s hit (G78-47). A hit skips /api/search entirely.
+//   D1 for one full-corpus ingest, uncached, upper estimate treating COUNT and OFFSET as scans:
+//     ~19.2M rows read and ~6,022 rows written, against Workers Paid inclusions of 25B rows read and
+//     50M rows written per month (0.08% and 0.01%).
+//   At the valve's ceiling one IP is 2 calls/s: 2 upstream Function invocations/s and ~6 D1
+//     statements/s. The tightest shared limit on the path is the Airtable telemetry mirror (5
+//     requests/s per base); it is non-blocking and D1 stays the log of record.
+//   Backstop: 20,000 / 3,011 = 6.6x a full-corpus ingest (3.3x if the corpus doubled). Reachable
+//     only after 166.7 minutes at the valve's ceiling.
+//
+// SUBSTRATE LIMITS, stated plainly. CALL_METER is Workers KV: eventually consistent across
+// locations, at most 1 write per second to the same key (more throws 429), expirationTtl >= 60 s.
+// So a per-call put on one key could never record more than ~60 calls/min and the counter could
+// not rise to the limit. Each isolate therefore keeps a local count per window key, decides on
+// max(KV value, last value it wrote) + calls not yet written, and writes KV at most once per second
+// per key. A burst on one isolate is refused exactly. A burst spread across isolates is counted
+// best effort, since concurrent writers can overwrite each other. Any KV fault fails OPEN: a
+// safety-valve fault never refuses a read. Exact cross-location counting would need a Durable
+// Object or a rate-limiting binding, which is a binding change and out of scope here.
+const RATE_KEY_TTL_SECONDS = 120;          // KV minimum is 60
+const DAILY_KEY_TTL_SECONDS = 172800;      // 48 h, unchanged from the prior daily meter
+const KV_MIN_WRITE_GAP_MS = 1000;
+const LOCAL_COUNTER_MAX_KEYS = 5000;
+
+// Per-isolate window counters. Replaced wholesale when it grows past LOCAL_COUNTER_MAX_KEYS.
+let localCounters = new Map();
+
+// Test seam only: lets a test start a fresh "isolate". Inert at runtime (Pages routes onRequest*).
+export function resetRateValveIsolateStateForTests() { localCounters = new Map(); }
+
+function valveNow(env) {
+  // Test seam only: a function cannot be configured as a Pages env var.
+  return (env && typeof env.__CLOCK_FOR_TESTS === 'function') ? env.__CLOCK_FOR_TESTS() : Date.now();
+}
+
+async function readCounter(meter, key) {
+  try { return parseInt(await meter.get(key) || '0', 10) || 0; }
+  catch (e) { console.error('rate valve: meter read failed, failing open:', e && e.message); return null; }
+}
+
+function localEntry(key) {
+  let e = localCounters.get(key);
+  if (!e) {
+    if (localCounters.size >= LOCAL_COUNTER_MAX_KEYS) localCounters = new Map();
+    e = { written: 0, pending: 0, lastPutMs: -Infinity, refusedLogged: false };
+    localCounters.set(key, e);
+  }
+  return e;
+}
+
+async function recordCall(meter, key, e, effective, nowMs, ttl) {
+  e.pending += 1;
+  if (nowMs - e.lastPutMs < KV_MIN_WRITE_GAP_MS) return;
+  const value = effective + 1;
+  try {
+    await meter.put(key, String(value), { expirationTtl: ttl });
+    e.written = value; e.pending = 0; e.lastPutMs = nowMs;
+  } catch (err) {
+    // Left pending; the next call on this isolate retries. Never refuses the call.
+    console.error('rate valve: meter write failed, failing open:', err && err.message);
+  }
+}
+
+// Returns { allowed: true } or { allowed: false, reason, retryAfterSeconds, refusal, logRefusal }.
+export async function checkRateValve(env, ip) {
+  const meter = env?.CALL_METER;
+  if (!meter) return { allowed: true };
+  const nowMs = valveNow(env);
+  const windowMs = RATE_WINDOW_SECONDS * 1000;
+  const windowStart = Math.floor(nowMs / windowMs) * windowMs;
+  const day = new Date(nowMs).toISOString().slice(0, 10);
+  const rateKey = `ip_rate:${ip}:${windowStart / 1000}`;
+  const dayKey = `ip_daily:${ip}:${day}`;
+
+  const [rateKv, dayKv] = await Promise.all([readCounter(meter, rateKey), readCounter(meter, dayKey)]);
+  const rateE = localEntry(rateKey);
+  const dayE = localEntry(dayKey);
+  const rateCount = Math.max(rateKv ?? 0, rateE.written) + rateE.pending;
+  const dayCount = Math.max(dayKv ?? 0, dayE.written) + dayE.pending;
+
+  if (rateCount >= RATE_LIMIT_PER_WINDOW || dayCount >= DAILY_BACKSTOP) {
+    const byRate = rateCount >= RATE_LIMIT_PER_WINDOW;
+    const endMs = byRate ? windowStart + windowMs : Date.parse(`${day}T00:00:00.000Z`) + 86400000;
+    const retryAfterSeconds = Math.max(1, Math.ceil((endMs - nowMs) / 1000));
+    const entry = byRate ? rateE : dayE;
+    const logRefusal = !entry.refusedLogged;
+    entry.refusedLogged = true;
+    const reason = byRate
+      ? `Rate limit exceeded: more than ${RATE_LIMIT_PER_WINDOW} calls in ${RATE_WINDOW_SECONDS} seconds from this IP. Retry after ${retryAfterSeconds} seconds. Nothing is wrong with the request; pacing at or below ${RATE_LIMIT_PER_WINDOW / RATE_WINDOW_SECONDS} calls per second is never refused.`
+      : `Rate limit exceeded: the daily safety backstop of ${DAILY_BACKSTOP.toLocaleString('en-US')} calls from this IP was reached. Retry after ${retryAfterSeconds} seconds (00:00 UTC).`;
+    return { allowed: false, reason, retryAfterSeconds, refusal: byRate ? 'rate' : 'daily_backstop', logRefusal };
+  }
+
+  if (rateKv !== null) await recordCall(meter, rateKey, rateE, rateCount, nowMs, RATE_KEY_TTL_SECONDS);
+  if (dayKv !== null) await recordCall(meter, dayKey, dayE, dayCount, nowMs, DAILY_KEY_TTL_SECONDS);
+  return { allowed: true };
+}
 
 // Legacy plan limits retained so any pre-existing keyed caller keeps working. Keys are NOT required.
 const PLAN_LIMITS = {
@@ -905,10 +1018,10 @@ const PLAN_LIMITS = {
   payg:       { limit: Infinity, hardCap: false, reportUsage: true,  meterEvent: 'gph_api_call' },
 };
 
-function utcDay() { return new Date().toISOString().slice(0, 10); }
-
 async function checkAccess(env, apiKey, request) {
-  // Legacy keyed access (optional): a recognized, non-canceled key bypasses the anonymous daily cap.
+  // Legacy keyed access (optional): a recognized, non-canceled key within its plan bypasses the
+  // anonymous valve. An exhausted, unrecognized or canceled key falls through to the anonymous
+  // valve -- never a hard block, since a monthly TOTAL is not a reason to stop a read.
   if (apiKey) {
     const kv = env?.GPH_API_KEYS;
     if (kv) {
@@ -916,29 +1029,17 @@ async function checkAccess(env, apiKey, request) {
       if (raw) {
         const record = JSON.parse(raw);
         const planSpec = PLAN_LIMITS[record.plan];
-        if (record.status !== 'canceled' && planSpec) {
-          if (planSpec.hardCap && record.callsThisPeriod >= planSpec.limit) {
-            return { allowed: false, reason: `Monthly quota reached (${planSpec.limit.toLocaleString()} calls on the ${record.plan} plan). For bulk or unmetered access, license the dataset at ${LICENSING_URL}` };
-          }
+        if (record.status !== 'canceled' && planSpec && !(planSpec.hardCap && record.callsThisPeriod >= planSpec.limit)) {
           return { allowed: true, record, apiKey, planSpec };
         }
       }
     }
-    // Unrecognized or canceled key: fall through to the free anonymous tier (never hard-block).
   }
 
-  // Free anonymous tier — 100 calls/IP/day (UTC), rolling daily, no lifetime cap.
-  const meter = env?.CALL_METER;
-  if (meter) {
-    // See RATE-CONTROL PURPOSE above: this meter is a safety valve, not an enumeration gate.
-    const ip = request.headers.get('cf-connecting-ip') || 'unknown';
-    const dayKey = `ip_daily:${ip}:${utcDay()}`;
-    const count = parseInt(await meter.get(dayKey) || '0', 10);
-    if (count >= DAILY_LIMIT) {
-      return { allowed: false, reason: `Free tier limit reached (${DAILY_LIMIT} calls/IP/day; resets 00:00 UTC). For bulk or unmetered access, license the dataset at ${LICENSING_URL}` };
-    }
-    await meter.put(dayKey, String(count + 1), { expirationTtl: 172800 });
-  }
+  // Anonymous tier: see RATE-CONTROL PURPOSE above -- a safety valve on request rate, not a gate.
+  const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+  const valve = await checkRateValve(env, ip);
+  if (!valve.allowed) return valve;
   return { allowed: true, anonymous: true };
 }
 
@@ -1074,6 +1175,8 @@ function funnelStep(tool) {
 //   'ingestion' -- search_providers with category only (with or without page / per_page).
 //   'reference' -- list_categories (a lookup with no demand specification; mirrors funnel_step).
 //   null        -- any other tool name.
+// 'pathological_rate' is NOT produced by this function: handleMcpRequest sets it on the one row it
+// writes for the first rate-valve refusal per IP per window (GPH-MCP-RATE-VALVE-01).
 //
 // WHAT THIS RULE CANNOT KNOW, stated plainly. One call cannot see a traversal. So:
 //   (1) a human-driven, category-only first look ("list credentialing services", page 1) is classed
@@ -1343,7 +1446,18 @@ export async function handleMcpRequest(body, env, apiKey, ctx) {
 
       const validation = await checkAccess(env, apiKey, ctx.request);
       if (!validation.allowed) {
-        return jsonrpc(id, { content: [{ type: 'text', text: validation.reason }], isError: true });
+        // Rate-valve refusal: operational text plus a structured retry_after_seconds.
+        // TELEMETRY: the FIRST refusal per IP per window (per isolate) writes one D1 row with
+        // traffic_class 'pathological_rate' (a new value in the existing TEXT column, no schema
+        // change). Later refusals in that window write nothing and skip the Airtable mirror, so a
+        // flood cannot turn each refused call into more writes.
+        if (validation.logRefusal) {
+          const rec = await buildTelemetry('gph', ctx.request, env, name, args || {}, null, 'anonymous', null, null);
+          rec.traffic_class = 'pathological_rate';
+          const w = writeTelemetryD1(env, rec);
+          if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(w); else await w;
+        }
+        return jsonrpc(id, { content: [{ type: 'text', text: validation.reason }], isError: true, retry_after_seconds: validation.retryAfterSeconds });
       }
 
       // S3/S4: validate against the tool's own declared schema before serving. A rejection is
