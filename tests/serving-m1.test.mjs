@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   TOOLS, callTool, handleMcpRequest, classifyTrafficClass, buildTelemetry,
-  searchCacheKey, fetchSearchData, SEARCH_CACHE_TTL_SECONDS,
+  searchCacheKey, searchUpstreamParams, fetchSearchData, SEARCH_CACHE_TTL_SECONDS,
   TELEMETRY_D1_BASE_COLUMNS, TELEMETRY_D1_M1_COLUMNS,
 } from '../functions/mcp.js';
 
@@ -44,8 +44,9 @@ function mockUpstream({ total = 3536, category = 'Laboratory & Diagnostics Servi
     const u = new URL(String(url));
     calls.push(u);
     assert.equal(u.pathname, '/api/search', `unexpected upstream ${u}`);
-    const perPage = Math.min(50, Math.max(1, parseInt(u.searchParams.get('per_page'), 10) || 20));
-    const page = Math.max(1, parseInt(u.searchParams.get('page'), 10) || 1);
+    // Parsed exactly as production functions/api/search.js does: parseInt with NO radix (G78-41).
+    const perPage = Math.min(50, Math.max(1, parseInt(u.searchParams.get('per_page')) || 20));
+    const page = Math.max(1, parseInt(u.searchParams.get('page')) || 1);
     const start = (page - 1) * perPage;
     const n = Math.max(0, Math.min(perPage, total - start));
     const providers = Array.from({ length: n }, (_, i) => ({
@@ -162,6 +163,80 @@ test('cache key: normalizes exactly what /api/search normalizes, and nothing it 
   assert.notEqual(k({ category: LAB, practice_size_fit: 'Solo' }), k({ category: LAB, practice_size_fit: 'Small' }));
   // Category is keyed verbatim: its alias resolver lives upstream and is not assumed here.
   assert.notEqual(k({ category: 'billing' }), k({ category: 'Billing' }));
+});
+
+// Effective query exactly as production Crindo2/getpracticehelp functions/api/search.js (70569ae0)
+// parses the params this server sends. Parse lines copied verbatim, including parseInt WITHOUT a
+// radix (G78-41 VERIFY_FAIL G41-D1). Returns the SQL binds that decide the rows.
+function productionEffectiveQuery(url) {
+  const sp = new URL(String(url)).searchParams;
+  const category = sp.get('category');
+  const state = sp.get('state');
+  const city = sp.get('city');
+  const min_rating = parseFloat(sp.get('min_rating')) || 0;
+  const tier1_grade = sp.get('tier1_grade');
+  const practice_size_fit = sp.get('practice_size_fit');
+  const page = Math.max(1, parseInt(sp.get('page')) || 1);
+  const per_page = Math.min(50, Math.max(1, parseInt(sp.get('per_page')) || 20));
+  const binds = {};
+  if (category) binds.category = category;
+  if (state) binds.state = state.toUpperCase();
+  if (city) binds.city = city.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  if (min_rating > 0) binds.min_rating = min_rating;
+  if (tier1_grade) binds.tier1_grade = tier1_grade.toUpperCase();
+  if (practice_size_fit) binds.practice_size_fit = practice_size_fit;
+  binds.per_page = per_page;
+  binds.offset = (page - 1) * per_page;
+  return JSON.stringify(binds);
+}
+
+test('cache key soundness (fuzz): equal cache key implies an identical production /api/search query', () => {
+  const PAGE = [undefined, 1, 2, 1.9, '1', '2', '0x10', '0X2', ' 0x3', '-0x1', '1e3', 1e21, 0, -4, '', 'abc', [3], true];
+  const PER_PAGE = [undefined, 10, 25, 26, '0x10', '5', 0, -3, 2.7, 'abc'];
+  const MIN_RATING = [undefined, 0, 50, '50', 50.0, 49.99, '0x10', -1, 'abc'];
+  const STATE = [undefined, 'tx', 'TX', ' TX'];
+  const CITY = [undefined, 'San Antonio', 'san-antonio', 'san  antonio', 'San_Antonio!'];
+  const byKey = new Map();
+  const collisions = [];
+  for (const page of PAGE) for (const per_page of PER_PAGE) for (const min_rating of MIN_RATING)
+    for (const state of STATE) for (const city of CITY) {
+      const args = { category: LAB };
+      if (page !== undefined) args.page = page;
+      if (per_page !== undefined) args.per_page = per_page;
+      if (min_rating !== undefined) args.min_rating = min_rating;
+      if (state !== undefined) args.state = state;
+      if (city !== undefined) args.city = city;
+      const key = searchCacheKey(args);
+      const eff = productionEffectiveQuery(`https://www.getpracticehelp.com/api/search?${searchUpstreamParams(args)}`);
+      if (!byKey.has(key)) byKey.set(key, { eff, args });
+      else if (byKey.get(key).eff !== eff) collisions.push([byKey.get(key).args, args]);
+    }
+  assert.equal(collisions.length, 0,
+    `two calls /api/search answers differently share a cache entry, e.g. ${JSON.stringify(collisions.slice(0, 2))}`);
+});
+
+test('cache poisoning regression (G78-41): page "0x10" is upstream page 16 and never fills or reads the page-1 entry', async () => {
+  assert.notEqual(searchCacheKey({ category: LAB, page: '0x10' }), searchCacheKey({ category: LAB, page: 1 }));
+  assert.equal(searchCacheKey({ category: LAB, page: '0x10' }), searchCacheKey({ category: LAB, page: 16 }),
+    'the key reads page as production does');
+  const cache = fakeCache();
+  const up = mockUpstream();
+  const t0 = 1_800_000_000_000;
+  await withFetch(up.fetchFn, async () => {
+    // Miss-first order: the hex page is fetched while page 1 is uncached in this colo.
+    const hex = await fetchSearchData({ category: LAB, per_page: 25, page: '0x10' }, { cache, now: t0 });
+    assert.equal(hex.data.pagination.page, 16, 'mock parses page as production does (hex string -> 16)');
+    assert.equal(hex.data.providers[0].slug, 'lab-376');
+    const one = await fetchSearchData({ category: LAB, per_page: 25, page: 1 }, { cache, now: t0 + 1000 });
+    assert.equal(one.cacheStatus, 'miss', 'page 1 must not hit the entry the hex page stored');
+    assert.equal(one.data.providers[0].slug, 'lab-1');
+    // Hit-first order: page 1 is cached, then the hex page must not be served page-1 rows.
+    const hex2 = await fetchSearchData({ category: LAB, per_page: 25, page: '0x10' }, { cache, now: t0 + 2000 });
+    assert.equal(hex2.data.providers[0].slug, 'lab-376');
+    const one2 = await fetchSearchData({ category: LAB, per_page: 25, page: 1 }, { cache, now: t0 + 3000 });
+    assert.equal(one2.cacheStatus, 'hit');
+    assert.equal(one2.data.providers[0].slug, 'lab-1');
+  });
 });
 
 test('cache TTL: an entry is served up to the bound and refetched at and after it', async () => {

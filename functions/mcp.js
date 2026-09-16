@@ -765,8 +765,9 @@ export function searchCacheKey(args = {}) {
   if (grade) eff.push(['tier1_grade', grade.toUpperCase()]);
   const size = sent.get('practice_size_fit');
   if (size) eff.push(['practice_size_fit', size]);
-  eff.push(['per_page', String(Math.min(50, Math.max(1, parseInt(sent.get('per_page'), 10) || 20)))]);
-  eff.push(['page', String(Math.max(1, parseInt(sent.get('page'), 10) || 1))]);
+  // parseInt with NO radix, exactly as search.js: a hex string page ('0x10') is page 16 upstream (G78-41).
+  eff.push(['per_page', String(Math.min(50, Math.max(1, parseInt(sent.get('per_page')) || 20)))]);
+  eff.push(['page', String(Math.max(1, parseInt(sent.get('page')) || 1))]);
   eff.sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0));
   return `${SEARCH_CACHE_KEY_BASE}?${new URLSearchParams(eff)}`;
 }
