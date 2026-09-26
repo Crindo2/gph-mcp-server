@@ -77,3 +77,16 @@ Workers KV is eventually consistent. It allows at most 1 write per second to the
 - **Limits:** a single call cannot see a traversal. A human's category-only first look is classed `ingestion`, and a sweep that adds a filter is classed `demand`. Page coverage, sequence, repeat passes and the self-reported user agent are not consulted. Window-level reclassification is M3.
 - The Airtable mirror is unchanged. D1 is the log of record.
 - **Apply order:** either order is safe. If the code is live first, the writer falls back to the pre-M1 column set and logs `migration not applied`.
+
+## Telemetry: caller_kind, agent_intent, caller_agent
+
+`mcp_usage_log` gains three more nullable columns in `migrations/2026_09_25_mcp_usage_log_caller_kind_agent_intent_caller_agent.sql` (T3-CALLER-CLASSIFICATION-REPAIR, ALLOC-AEO-SPINE-T3-G99-34). Additive; `caller_class` is unchanged and still drives the legacy rollup.
+
+- **The defect this repairs:** `caller_class`'s `organic_assistant` value is the one the nightly rollup reads as organic demand, but it cannot distinguish a person asking an assistant from a developer's own agent tooling calling the server (e.g. the OpenAI Codex CLI, which sends a UA `assistantFromUA` matches). It also has no `human` value at all -- a real browser UA falls through to `unknown` alongside generic HTTP clients.
+- `caller_kind`: `human` | `model_agent` | `bot` | `self_test` | `unattributed`, set at write time by `callerIdentity()` in `functions/mcp.js`. Exhaustive and mutually exclusive -- the only dimension a published demand figure should be cut on. `unattributed` asserts identity could not be established; it is deliberately not `unknown`, which reads as maybe-human.
+- `agent_intent`: `end_user` | `dev_tool`, set only when `caller_kind = 'model_agent'`; NULL otherwise. `dev_tool` is a developer's own agent runtime (Codex, Claude Code, Cursor, an SDK, ...) and must be excluded from any organic/end-user demand figure.
+- `caller_agent`: the normalized, sanitised product token (e.g. `openai-codex`, `claude-user`, `browser`), bounded to 40 chars and never raw user-agent text.
+- Network-free and deterministic at write time (UA + Origin only), like `traffic_class`. Historical rows are backfillable by the identical rules (M3-style, not run here).
+- **Gate:** `tests/caller-classification.test.mjs`, 17 tests fixtured on all 43 distinct user-agents in the production `mcp_usage_log` corpus (3,922 rows, read 2026-09-11) -- including a pin that legacy `caller_class` has not moved for any of them.
+- Airtable mirror gains `Caller Kind`, `Agent Intent`, `Caller Agent`. `typecast` auto-creates a missing select *option* but not a missing *field* -- an unknown field name 422s the whole record -- so `logToolCall` retries once with the stable core alone on `UNKNOWN_FIELD_NAME` and logs it. A schema lag costs the three new columns, never the row.
+- **Apply order:** either order is safe. `writeTelemetryD1` tries columns widest-first (base + M1 + this migration) and falls back a tier at a time on "no column named", so deploying before applying loses only the newest labels, never the row.
