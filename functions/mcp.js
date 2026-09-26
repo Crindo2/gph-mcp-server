@@ -1137,7 +1137,7 @@ function assistantChannel(ua, originHost) {
   return assistantFromOrigin(originHost) || assistantFromUA(ua);
 }
 
-function classifyCaller(ua, originHost) {
+export function classifyCaller(ua, originHost) {
   if (assistantFromOrigin(originHost)) return 'organic_assistant';
   const u = (ua || '').trim();
   if (!u) return 'unknown';
@@ -1148,9 +1148,153 @@ function classifyCaller(ua, originHost) {
   // test -- it must not be hidden as self_test. It falls through to known_crawler
   // below, which the nightly rollup excludes from organic (honest, not organic).
   if (/^cbeg-/i.test(u)) return 'self_test';
+  // T3-CALLER-CLASSIFICATION-REPAIR (ALLOC-AEO-SPINE-T3-G99-34). The documented AI *crawlers*
+  // (GPTBot, OAI-SearchBot, ClaudeBot, anthropic-ai, PerplexityBot, ...) carry a vendor name
+  // that `assistantFromUA` matches below, so an index crawl returned 'organic_assistant'. This
+  // branch runs FIRST so the vendor-name test can never claim one. Zero rows in the production
+  // corpus are affected (D1 e8605bbb, read 2026-09-11: no GPTBot/OAI-SearchBot/ClaudeBot/
+  // anthropic-ai row exists), so the legacy caller_class series is unchanged on traffic it has
+  // actually seen -- forward-only, not a redefinition.
+  if (AI_CRAWLER_UA.test(u)) return 'known_crawler';
   if (assistantFromUA(u)) return 'organic_assistant';
   if (/bot\b|spider|crawl|chiark|slurp|bingpreview|facebookexternalhit|quality index|scraper|http-client|^curl|^wget|python-requests|python-httpx|\bhttpx\b|node-fetch|go-http-client|^axios|postman|insomnia/i.test(u)) return 'known_crawler';
   return 'unknown';
+}
+
+// ============================================================================
+// CALLER IDENTITY (T3-MCP-ZERO-RESULT-AND-CALLER-CLASS, ALLOC-AEO-SPINE-T3-G99-34; carries
+// forward the GEN62 T3b design from PR #8 lane/caller-classification-g62 @ 976de45f, rebased
+// here onto main after #9-#13 because that branch predates them and cannot merge cleanly).
+//
+// THE DEFECT. `caller_class` above is a six-value enum that cannot answer the only question a
+// demand figure has to answer: WHO CALLED. Measured over the whole production corpus in D1
+// e8605bbb (mcp_usage_log, 3,922 rows, read 2026-09-11, not sampled):
+//
+//   1. `organic_assistant` -- the class the nightly rollup reads as ORGANIC demand -- is 673
+//      rows, and 664 of them (98.7%) are the OpenAI MCP client from ASN "Microsoft
+//      Limited"/"Microsoft Corporation": 433 carrying `openai-mcp/1.0.0 (Codex)` (the Codex
+//      developer CLI) and 231 bare `openai-mcp/1.0.0`. Exactly 8 rows (`Claude-User`) are an
+//      end-user assistant fetch, and 1 is the literal test string `verify-fix-organic`. A
+//      developer's agent harness and a person asking ChatGPT were the same row.
+//   2. There is NO HUMAN CLASS AT ALL. A real browser falls through every branch to 'unknown',
+//      alongside `SaSame-MCP-Audit/0.1` (112), `node` (92) and `undici` (50), which are bots.
+//      'unknown' meant "could be a person, could be a scanner" -- which is how a machine count
+//      off this endpoint got read as organic search traffic.
+//
+// THE REPAIR IS ADDITIVE AND FORWARD-ONLY. `caller_class` is NOT redefined: demand_rollup, the
+// nightly rollup and the Airtable single-select all key off its existing values. Three new
+// recorded dimensions carry the honest split, fixtured against all 43 distinct user-agents in
+// the production corpus in tests/caller-classification.test.mjs:
+//
+//   caller_kind   human | model_agent | bot | self_test | unattributed -- exhaustive, mutually
+//                 exclusive, and the ONLY dimension a published figure should be cut on.
+//                 'unattributed' asserts identity could not be established, NOT maybe-human.
+//   agent_intent  end_user vs dev_tool, inside model_agent only. THIS is the field that
+//                 separates real demand from build traffic.
+//   caller_agent  the normalized, sanitised product token, so a row names its caller.
+//
+// Network-free and deterministic at write time (UA + Origin only), like classifyCaller above.
+// ============================================================================
+
+const AI_CRAWLER_UA = /\b(gptbot|oai-searchbot|claudebot|claude-searchbot|anthropic-ai|perplexitybot|google-extended|applebot-extended|ccbot|bytespider|amazonbot|meta-externalagent|cohere-ai|diffbot|timpibot|omgili|youbot|duckassistbot|petalbot)\b/i;
+
+const END_USER_AGENT_UA = [
+  [/\bchatgpt-user\b/i,     'chatgpt-user',    'chatgpt'],
+  [/\bclaude-user\b/i,      'claude-user',     'claude'],
+  [/\bperplexity-user\b/i,  'perplexity-user', 'perplexity'],
+  [/\bgemini-user\b/i,      'gemini-user',     'gemini'],
+];
+
+// Codex is matched before bare openai-mcp because `openai-mcp/1.0.0 (Codex)` is 433 of the 664
+// openai-mcp rows -- the single largest identified population in the whole log.
+const DEV_AGENT_UA = [
+  [/openai-mcp[^)]*\(\s*codex/i,              'openai-codex',   'chatgpt'],
+  [/\bcodex-cli\b/i,                          'openai-codex',   'chatgpt'],
+  [/\bopenai-mcp\b/i,                         'openai-mcp',     'chatgpt'],
+  [/\bclaude-code\b/i,                        'claude-code',    'claude'],
+  [/\bclaude-desktop\b/i,                     'claude-desktop', 'claude'],
+  [/\bmcp-remote\b/i,                         'mcp-remote',     null],
+  [/\bmcp-inspector\b|\bmodelcontextprotocol\b/i, 'mcp-inspector', null],
+  [/\bcursor\b/i,                             'cursor',         null],
+  [/\bwindsurf\b/i,                           'windsurf',       null],
+  [/\bcline\b/i,                              'cline',          null],
+  [/\bcopilot\b/i,                            'copilot',        'copilot'],
+  [/\bopenai-python\b|\bopenai-node\b/i,      'openai-sdk',     'chatgpt'],
+  [/\banthropic-python\b|\banthropic-sdk\b/i, 'anthropic-sdk',  'claude'],
+  [/\blangchain\b|\bllama-?index\b/i,         'llm-framework',  null],
+];
+
+// A real browser announces Mozilla/5.0 AND a versioned engine token. Two probe UAs in the
+// corpus carry the prefix and NO engine token, which is why both halves are required: a
+// Mozilla/5.0 prefix alone is a costless string any scanner can copy.
+const BROWSER_PREFIX_UA = /^mozilla\/5\.0\b/i;
+const BROWSER_ENGINE_UA = /\b(chrome|crios|safari|firefox|fxios|edg|edge|edga|edgios|opr|opera|trident|gecko)\/[\d.]+/i;
+
+const MONITOR_UA = /probe|listability|uptime|pingdom|healthcheck|statuscake|\bmonitor\b|uptimerobot|newrelic|datadog/i;
+const GENERIC_CLIENT_UA = /bot\b|spider|crawl|chiark|slurp|bingpreview|facebookexternalhit|quality index|scraper|scanner|audit|collector|census|catalog|registry|toolrouter|\bstudy\b|\bprove\b|\bminer\b|\bgrader\b|\bsync\b|^curl|\bcurl\/|^wget|python-requests|python-httpx|\bhttpx\b|node-fetch|go-http-client|^axios|postman|insomnia|^node$|^node\/|undici|okhttp|java\/|libwww|guzzle|^got\b|apache-httpclient/i;
+
+// The first token of a UA, sanitised to a short lowercase slug -- so an unrecognised caller is
+// NAMEABLE in a report instead of being an anonymous bucket. Never leaks raw UA text (no '@').
+export function agentSlug(ua) {
+  const head = String(ua || '').trim().split(/[\s;()]/)[0].split('/')[0];
+  const slug = head.toLowerCase().replace(/[^a-z0-9._-]/g, '').slice(0, 40);
+  return slug || null;
+}
+
+function matchAgentTable(table, ua) {
+  if (!ua) return null;
+  for (const row of table) if (row[0].test(ua)) return row;
+  return null;
+}
+
+// The honest caller split. Returns caller_class/assistant_channel UNCHANGED (nothing
+// downstream moves) plus the three new dimensions.
+export function callerIdentity(ua, originHost) {
+  const u = String(ua == null ? '' : ua).trim();
+  const caller_class = classifyCaller(u, originHost);
+  const assistant_channel = assistantChannel(u, originHost);
+  const originAssistant = assistantFromOrigin(originHost);
+
+  let caller_kind = 'unattributed';
+  let agent_intent = null;
+  let caller_agent = null;
+
+  const endUserHit = matchAgentTable(END_USER_AGENT_UA, u);
+  const devHit = endUserHit ? null : matchAgentTable(DEV_AGENT_UA, u);
+
+  if (/^cbeg-/i.test(u)) {
+    caller_kind = 'self_test';
+    caller_agent = 'cbeg-harness';
+  } else if (AI_CRAWLER_UA.test(u)) {
+    caller_kind = 'bot';
+    caller_agent = agentSlug(u);
+  } else if (endUserHit) {
+    caller_kind = 'model_agent';
+    agent_intent = 'end_user';
+    caller_agent = endUserHit[1];
+  } else if (devHit) {
+    caller_kind = 'model_agent';
+    agent_intent = 'dev_tool';
+    caller_agent = devHit[1];
+  } else if (originAssistant) {
+    // A browser Origin on an assistant host: a person is in the assistant's own web surface,
+    // so the runtime is calling on a human's behalf. Checked AFTER the UA tables so a dev tool
+    // that happens to send an assistant Origin is still reported as a dev tool.
+    caller_kind = 'model_agent';
+    agent_intent = 'end_user';
+    caller_agent = originAssistant + '-web';
+  } else if (MONITOR_UA.test(u) || GENERIC_CLIENT_UA.test(u)) {
+    caller_kind = 'bot';
+    caller_agent = agentSlug(u);
+  } else if (BROWSER_PREFIX_UA.test(u) && BROWSER_ENGINE_UA.test(u)) {
+    caller_kind = 'human';
+    caller_agent = 'browser';
+  } else {
+    caller_kind = 'unattributed';
+    caller_agent = u ? agentSlug(u) : null;
+  }
+
+  return { caller_class, assistant_channel, caller_kind, agent_intent, caller_agent };
 }
 
 function funnelStep(tool) {
@@ -1263,12 +1407,19 @@ export async function buildTelemetry(server, request, env, toolName, args, resul
   const rc = (typeof resultsCount === 'number') ? resultsCount : null;
   const zero = (step !== 'reference' && rc === 0) ? 1 : 0;
   const a = args || {};
+  const who = callerIdentity(ua, originHost);
   return {
     ts: new Date().toISOString(),
     server,
     tool: toolName || '',
-    caller_class: classifyCaller(ua, originHost),
-    assistant_channel: assistantChannel(ua, originHost),
+    caller_class: who.caller_class,
+    assistant_channel: who.assistant_channel,
+    // T3-CALLER-CLASSIFICATION-REPAIR (ALLOC-AEO-SPINE-T3-G99-34): additive, forward-only.
+    // caller_class above is UNCHANGED -- these three carry the honest human/dev-tool/bot split
+    // caller_class cannot express. See callerIdentity() for the full defect writeup.
+    caller_kind: who.caller_kind,
+    agent_intent: who.agent_intent,
+    caller_agent: who.caller_agent,
     source: 'mcp',
     user_agent: ua,
     referer: request.headers.get('referer') || null,
@@ -1322,6 +1473,9 @@ export const TELEMETRY_D1_BASE_COLUMNS = [
 ];
 // Added by migrations/2026_09_16_mcp_usage_log_traffic_class_cache_status.sql (ADD COLUMN only).
 export const TELEMETRY_D1_M1_COLUMNS = ['traffic_class', 'cache_status'];
+// Added by migrations/2026_09_25_mcp_usage_log_caller_kind_agent_intent_caller_agent.sql
+// (T3-CALLER-CLASSIFICATION-REPAIR, ALLOC-AEO-SPINE-T3-G99-34; ADD COLUMN only).
+export const TELEMETRY_D1_M2_COLUMNS = ['caller_kind', 'agent_intent', 'caller_agent'];
 
 function insertTelemetry(db, rec, columns) {
   return db.prepare(
@@ -1329,28 +1483,37 @@ function insertTelemetry(db, rec, columns) {
   ).bind(...columns.map(c => (rec[c] === undefined ? null : rec[c]))).run();
 }
 
-// ORDERING SAFETY. main auto-deploys on merge and the migration is applied by hand. If this code
-// is live before the two columns exist, the extended INSERT fails with "no column named" -- and
-// without this fallback every D1 telemetry row would be lost until the migration landed. On exactly
-// that error the row is re-written with the pre-M1 column set, so deploy-before-migrate loses only
-// the two new labels, never the call record.
+// ORDERING SAFETY. main auto-deploys on merge and each migration is applied by hand. If this
+// code is live before a given migration's columns exist, the wider INSERT fails with "no column
+// named" -- and without these fallbacks every D1 telemetry row would be lost until the migration
+// landed. On exactly that error the row is re-written with the next-narrower column set, so
+// deploy-before-migrate loses only the newest labels, never the call record.
+// Column sets tried widest-first. Each tier is the previous migration's columns dropped, so a
+// deploy that lands before its migration degrades to the next-narrower shape instead of losing
+// the row.
+const TELEMETRY_D1_COLUMN_TIERS = [
+  [...TELEMETRY_D1_BASE_COLUMNS, ...TELEMETRY_D1_M1_COLUMNS, ...TELEMETRY_D1_M2_COLUMNS],
+  [...TELEMETRY_D1_BASE_COLUMNS, ...TELEMETRY_D1_M1_COLUMNS],
+  TELEMETRY_D1_BASE_COLUMNS,
+];
+
 async function writeTelemetryD1(env, rec) {
   const db = env && env.TELEMETRY_DB;
   if (!db) { console.error('writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped'); return; }
-  try {
-    await insertTelemetry(db, rec, [...TELEMETRY_D1_BASE_COLUMNS, ...TELEMETRY_D1_M1_COLUMNS]);
-  } catch (e) {
-    const msg = (e && e.message) || '';
-    if (/no column named|no such column/i.test(msg)) {
-      console.error('writeTelemetryD1: traffic_class/cache_status columns absent (migration not applied) -- writing pre-M1 row');
-      try {
-        await insertTelemetry(db, rec, TELEMETRY_D1_BASE_COLUMNS);
-      } catch (e2) {
-        console.error('writeTelemetryD1: D1 telemetry write threw:', e2 && e2.message);
-      }
+  for (let tier = 0; tier < TELEMETRY_D1_COLUMN_TIERS.length; tier++) {
+    try {
+      await insertTelemetry(db, rec, TELEMETRY_D1_COLUMN_TIERS[tier]);
       return;
+    } catch (e) {
+      const msg = (e && e.message) || '';
+      const isMissingColumn = /no column named|no such column/i.test(msg);
+      const isLastTier = tier === TELEMETRY_D1_COLUMN_TIERS.length - 1;
+      if (!isMissingColumn || isLastTier) {
+        console.error('writeTelemetryD1: D1 telemetry write threw:', msg);
+        return;
+      }
+      console.error(`writeTelemetryD1: tier ${tier} columns absent (migration not applied) -- retrying narrower`);
     }
-    console.error('writeTelemetryD1: D1 telemetry write threw:', msg);
   }
 }
 
@@ -1366,55 +1529,78 @@ function computeSignalScore(rec) {
 
 // Independent, non-blocking Airtable sink. Own try/catch; never throws. Surfaces auth/
 // schema failures so a dead write cannot go unseen again (the 2026-04-18 blind spot).
+async function postAirtableRecord(atKey, fields) {
+  return fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_LOG_TABLE}`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${atKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ records: [{ fields }], typecast: true }),
+  });
+}
+
 async function logToolCall(env, rec, request) {
   const atKey = env?.AIRTABLE_PAT;
   if (!atKey) { console.error('logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped'); return; }
   let surfacedCount = 0;
   if (rec.vendor_surfaced) { try { surfacedCount = JSON.parse(rec.vendor_surfaced).length; } catch (e) {} }
+  const coreFields = {
+    'Tool Name': rec.tool,
+    'Category': rec.category || '',
+    'Specialty': rec.specialty || '',
+    'City': rec.city || '',
+    'State': rec.state || '',
+    'EHR System': rec.ehr_system || '',
+    'Results Count': rec.results_count || 0,
+    'Signal Score': computeSignalScore(rec),
+    'Timestamp': rec.ts,
+    'API Key': rec.api_key_tier || 'anonymous',
+    'User Agent': rec.user_agent || '',
+    'Source': rec.source || '',
+    'Caller Class': rec.caller_class,
+    ...(rec.assistant_channel ? { 'Assistant Channel': rec.assistant_channel } : {}),
+    'Session ID': rec.session_id || '',
+    'Funnel Step': rec.funnel_step || '',
+    'Zero Result': !!rec.zero_result,
+    'Raw Args': rec.raw_args || '',
+    'Demand Cell': rec.demand_cell || '',
+    'Vendor Drilled': rec.vendor_drilled || '',
+    'Vendor Surfaced Count': surfacedCount,
+    'Vendors Surfaced': rec.vendor_surfaced || '',
+    'Practice Size': rec.practice_size || '',
+    'Budget Range': rec.budget_range || '',
+    'Practice Size Fit': rec.practice_size_fit || '',
+    ...(typeof rec.field_completeness === 'number' ? { 'Field Completeness': rec.field_completeness } : {}),
+    'Country': (request && request.cf && request.cf.country) || '',
+    'Referer': (request && request.headers.get('referer')) || '',
+    ...(typeof rec.asn === 'number' ? { 'ASN': rec.asn } : {}),
+    'AS Organization': rec.as_organization || '',
+  };
+  // T3-CALLER-CLASSIFICATION-REPAIR: new Airtable columns. typecast auto-creates a missing
+  // select OPTION but not a missing FIELD -- an unknown field name 422s the WHOLE record -- so
+  // a first attempt that 422s on UNKNOWN_FIELD_NAME retries once with the stable core alone.
+  // A schema lag (fields not yet created in Airtable) costs the three new columns, never the row.
+  const newFields = {
+    'Caller Kind': rec.caller_kind || 'unattributed',
+    ...(rec.agent_intent ? { 'Agent Intent': rec.agent_intent } : {}),
+    'Caller Agent': rec.caller_agent || '',
+  };
   try {
-    const res = await fetch(`https://api.airtable.com/v0/${AT_BASE}/${AT_LOG_TABLE}`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${atKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        records: [{ fields: {
-          'Tool Name': rec.tool,
-          'Category': rec.category || '',
-          'Specialty': rec.specialty || '',
-          'City': rec.city || '',
-          'State': rec.state || '',
-          'EHR System': rec.ehr_system || '',
-          'Results Count': rec.results_count || 0,
-          'Signal Score': computeSignalScore(rec),
-          'Timestamp': rec.ts,
-          'API Key': rec.api_key_tier || 'anonymous',
-          'User Agent': rec.user_agent || '',
-          'Source': rec.source || '',
-          'Caller Class': rec.caller_class,
-          ...(rec.assistant_channel ? { 'Assistant Channel': rec.assistant_channel } : {}),
-          'Session ID': rec.session_id || '',
-          'Funnel Step': rec.funnel_step || '',
-          'Zero Result': !!rec.zero_result,
-          'Raw Args': rec.raw_args || '',
-          'Demand Cell': rec.demand_cell || '',
-          'Vendor Drilled': rec.vendor_drilled || '',
-          'Vendor Surfaced Count': surfacedCount,
-          'Vendors Surfaced': rec.vendor_surfaced || '',
-          'Practice Size': rec.practice_size || '',
-          'Budget Range': rec.budget_range || '',
-          'Practice Size Fit': rec.practice_size_fit || '',
-          ...(typeof rec.field_completeness === 'number' ? { 'Field Completeness': rec.field_completeness } : {}),
-          'Country': (request && request.cf && request.cf.country) || '',
-          'Referer': (request && request.headers.get('referer')) || '',
-          ...(typeof rec.asn === 'number' ? { 'ASN': rec.asn } : {}),
-          'AS Organization': rec.as_organization || ''
-        }}],
-        typecast: true
-      })
-    });
+    let res = await postAirtableRecord(atKey, { ...coreFields, ...newFields });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
-      console.error(`logToolCall: Airtable telemetry write failed ${res.status} ${detail.slice(0, 200)}`);
-      await env?.CALL_METER?.put('telemetry_last_fail', new Date().toISOString(), { expirationTtl: 172800 }).catch(() => {});
+      let isUnknownField = false;
+      try { isUnknownField = JSON.parse(detail)?.error?.type === 'UNKNOWN_FIELD_NAME'; } catch (e) {}
+      if (isUnknownField) {
+        console.error('logToolCall: Caller Kind/Agent Intent/Caller Agent fields absent in Airtable -- retrying with stable core');
+        res = await postAirtableRecord(atKey, coreFields);
+        if (!res.ok) {
+          const detail2 = await res.text().catch(() => '');
+          console.error(`logToolCall: Airtable telemetry write failed ${res.status} ${detail2.slice(0, 200)}`);
+          await env?.CALL_METER?.put('telemetry_last_fail', new Date().toISOString(), { expirationTtl: 172800 }).catch(() => {});
+        }
+      } else {
+        console.error(`logToolCall: Airtable telemetry write failed ${res.status} ${detail.slice(0, 200)}`);
+        await env?.CALL_METER?.put('telemetry_last_fail', new Date().toISOString(), { expirationTtl: 172800 }).catch(() => {});
+      }
     }
   } catch (e) {
     console.error('logToolCall: Airtable telemetry write threw:', e && e.message);
