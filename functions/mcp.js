@@ -157,12 +157,36 @@ function resolveEnrichedProfile(p = {}) {
   const apolloYear = firstNonEmpty(p.apollo_founded_year);
   const legacyTags = legacyServicesTags(p.services_tags);
 
+  // VENDOR-PRO-CODE-01 C1 (GEN100, ALLOC-VP-C1-G100-29, C417-C s.3) -- THE LATEST APPROVED
+  // provider_edits VALUE OUTRANKS BOTH enriched_* AND LEGACY, for the three fields the
+  // moderated claim/edit flow covers (functions/api/claim/edit.js EDITABLE_FIELDS intersected
+  // with what this resolver renders: description, services_tags, practice_size_fit).
+  // DEFECT THIS CLOSES: approval (functions/api/admin.js action=edit_update) writes an
+  // approved edit straight into the LEGACY columns, and this resolver already preferred
+  // enriched_* over legacy -- so on any row that also carries enrichment, an approved vendor
+  // edit landed in a column this function never returns. A paying member could get his edit
+  // approved and still never see it live.
+  // NOT A NEW SCHEMA: the caller merges the latest-approved values onto `p.approved_edits` (a
+  // plain object keyed by the SAME three field names, built from provider_edits rows already
+  // in the store) before calling in -- nothing here queries a table or adds a column. A row
+  // with no approved edit (p.approved_edits absent, or present but empty) resolves exactly as
+  // before this stage: the branch below degrades to the prior enriched-then-legacy behaviour
+  // byte-for-byte, which is what keeps the existing differential fixture (12 real rows, none
+  // of them carrying approved_edits) unchanged.
+  const approvedEdits = (p && typeof p.approved_edits === 'object' && p.approved_edits) || {};
+  const approvedDesc = firstNonEmpty(approvedEdits.description);
+  const approvedTags = (approvedEdits.services_tags !== undefined && approvedEdits.services_tags !== null)
+    ? legacyServicesTags(approvedEdits.services_tags)
+    : [];
+  const approvedSize = firstNonEmpty(approvedEdits.practice_size_fit);
+
   const hasEnrichment = Boolean(
     enrichedDesc || enrichedTags.length || certifications.length ||
     locations.length || enrichedSize || enrichedYear
   );
+  const hasApprovedEdit = Boolean(approvedDesc || approvedTags.length || approvedSize);
 
-  if (!hasEnrichment) {
+  if (!hasEnrichment && !hasApprovedEdit) {
     return {
       description: p.description,
       description_source: 'legacy',
@@ -183,14 +207,14 @@ function resolveEnrichedProfile(p = {}) {
   }
 
   return {
-    description: enrichedDesc || firstNonEmpty(p.description) || '',
-    description_source: enrichedDesc ? 'enriched' : 'legacy',
-    services_tags: enrichedTags.length ? enrichedTags : legacyTags,
-    services_tags_source: enrichedTags.length ? 'enriched' : 'legacy',
+    description: approvedDesc || enrichedDesc || firstNonEmpty(p.description) || '',
+    description_source: approvedDesc ? 'vendor_edit' : (enrichedDesc ? 'enriched' : 'legacy'),
+    services_tags: approvedTags.length ? approvedTags : (enrichedTags.length ? enrichedTags : legacyTags),
+    services_tags_source: approvedTags.length ? 'vendor_edit' : (enrichedTags.length ? 'enriched' : 'legacy'),
     certifications,
     locations,
-    practice_size_fit: enrichedSize || firstNonEmpty(p.practice_size_fit) || null,
-    practice_size_fit_source: enrichedSize ? 'enriched' : 'legacy',
+    practice_size_fit: approvedSize || enrichedSize || firstNonEmpty(p.practice_size_fit) || null,
+    practice_size_fit_source: approvedSize ? 'vendor_edit' : (enrichedSize ? 'enriched' : 'legacy'),
     founding_year: enrichedYear,
     founding_year_source: enrichedYear ? 'enriched' : 'none',
     apollo_founding_year: apolloYear,
@@ -200,7 +224,7 @@ function resolveEnrichedProfile(p = {}) {
     ),
     confidence: firstNonEmpty(p.extraction_confidence),
     grounded_in: firstNonEmpty(p.extraction_grounded_in),
-    has_enrichment: true,
+    has_enrichment: hasEnrichment,
   };
 }
 
@@ -630,8 +654,11 @@ export async function callTool(name, args) {
       `**Location:** ${p.city || 'National'}, ${p.state_abbr || 'US'}`,
       `**Profile Completeness:** ${profileCompletenessText(p.quality_score)}${p.verified ? ' ✓ Verified Listing' : ''}`,
       '',
-      e.description ? `## About\n${e.description}` : '',
-      tags.length ? `## Services\n${tags.join(', ')}` : '',
+      // VENDOR-PRO-CODE-01 C1 (GEN100, ALLOC-VP-C1-G100-29, C417-C s.3): "Label vendor-supplied
+      // fields as such." Same idiom as the practice-size-fit legacy-source note below --
+      // appended only on the branch that has just been proven to be a vendor_edit source.
+      e.description ? `## About\n${e.description}${e.description_source === 'vendor_edit' ? ' (vendor-supplied)' : ''}` : '',
+      tags.length ? `## Services\n${tags.join(', ')}${e.services_tags_source === 'vendor_edit' ? ' (vendor-supplied)' : ''}` : '',
       // P2 REPAIR (d136494c Y2.1): every line this stage ADDS gates on has_enrichment, not on
       // the resolved value. The web renderer's form of the same defect put a "Founded" section
       // sourced from apollo_founded_year, with no grounding disclosure of its own, on 14,267
@@ -662,9 +689,11 @@ export async function callTool(name, args) {
       // 'Solo/Small' renders unchanged. The C50 source note on the abstained cohort stays.
       sizeLabel
         ? `**Practice Size Fit:** ${sizeLabel}${
-            e.has_enrichment && e.practice_size_fit_source === 'legacy'
-              ? ' (legacy listing value, not extracted from public sources)'
-              : ''}`
+            e.practice_size_fit_source === 'vendor_edit'
+              ? ' (vendor-supplied)'
+              : (e.has_enrichment && e.practice_size_fit_source === 'legacy'
+                ? ' (legacy listing value, not extracted from public sources)'
+                : '')}`
         : '',
       e.has_enrichment && e.founding_year ? `**Founded:** ${e.founding_year}` : '',
       p.phone ? `**Phone:** ${p.phone}` : '',
