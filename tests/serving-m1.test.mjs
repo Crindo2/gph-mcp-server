@@ -363,6 +363,16 @@ const FULL_ROW = {
   enriched_practice_size_fit: 'Small', enriched_founding_year: 1999,
   extraction_confidence: 'high', extraction_grounded_in: 'site',
   phone: '512-555-0100', website: 'https://acme.example', google_rating: 4.6, google_review_count: 33,
+  // GPH-AEO-DATA-FIX-01 S2 (C553 s.2(c)): the API's computed labelled-fact block.
+  fact_provenance: {
+    labels: { researched: 'GPH-researched', vendor: 'Vendor-supplied', verified: 'GPH-verified', conclusion: 'GPH conclusion' },
+    facts: [
+      { key: 'description', fact: 'What they do', label: 'GPH-researched', basis: 'Extracted by GPH from public sources', checked_at: '2026-06-10' },
+      { key: 'website_check', fact: 'Website check', label: 'GPH-verified', basis: 'Automated GPH check that the website responds', checked_at: '2026-06-11' },
+      { key: 'category', fact: 'Category', label: 'GPH conclusion', basis: 'GPH classification', checked_at: null },
+    ],
+    last_checked: '2026-06-11',
+  },
 };
 
 async function renderDetail(row) {
@@ -384,7 +394,7 @@ test('descriptions: get_provider_detail promises only what the rendered profile 
   // Everything the description names is present in the render of a fully populated row.
   const promised = [
     ['company_name', '# Acme Labs'], ['category', `**Category:** ${LAB}`], ['city/state', 'Austin, TX'],
-    ['quality_score', '**Profile Completeness:** 80/100'], ['verified status', 'Verified Listing'],
+    ['quality_score', '**Profile Completeness:** 80/100'], ['Provenance section', '## Provenance'],
     ['description', 'Enriched about text.'], ['services offered', 'PCR testing'],
     ['practice_size_fit', '**Practice Size Fit:**'], ['phone', '512-555-0100'], ['website', 'https://acme.example'],
     ['Google rating and Google review count', '**Google Rating:** 4.6/5 (33 reviews)'],
@@ -549,4 +559,42 @@ test('enumeration: a full 142-page category walk completes with no refusal and c
   assert.equal(rows.length, 284, 'every call telemetered');
   assert.equal(rows.filter(r => r.cache_status === 'hit').length, 142);
   assert.ok(rows.every(r => r.traffic_class === 'ingestion'));
+});
+
+// ---------------------------------------------------------------- 3. C553 provenance + badge truth
+
+test('C553: get_provider_detail prints the API\'s labelled facts and last-checked date, and never a verified badge', async () => {
+  const text = await renderDetail(FULL_ROW);
+  assert.ok(text.includes('## Provenance'));
+  assert.ok(text.includes('- What they do: GPH-researched (Extracted by GPH from public sources), last checked 2026-06-10'));
+  assert.ok(text.includes('- Website check: GPH-verified (Automated GPH check that the website responds), last checked 2026-06-11'));
+  assert.ok(text.includes('- Category: GPH conclusion (GPH classification)'));
+  assert.ok(text.includes('Last checked: 2026-06-11.'));
+  // FULL_ROW carries verified: 1 -- the legacy flag. It is not a check and prints nothing.
+  assert.ok(!text.includes('Verified Listing') && !text.includes('\u2713'));
+});
+
+test('C553: an API body without fact_provenance (fenced vendor, or an older API) adds no Provenance section and invents nothing', async () => {
+  const { fact_provenance, ...rest } = FULL_ROW;
+  const text = await renderDetail(rest);
+  assert.ok(!text.includes('Provenance') && !text.includes('Last checked'));
+});
+
+test('C553: a malformed fact_provenance renders nothing rather than guessing', async () => {
+  for (const bad of [null, {}, { facts: 'x' }, { facts: [] }, { facts: [{ fact: 1, label: 2 }] }]) {
+    const text = await renderDetail({ ...FULL_ROW, fact_provenance: bad });
+    assert.ok(!text.includes('## Provenance'), JSON.stringify(bad));
+  }
+  // a non-date last_checked is dropped, not printed
+  const text = await renderDetail({ ...FULL_ROW, fact_provenance: { ...FULL_ROW.fact_provenance, last_checked: 'yesterday' } });
+  assert.ok(text.includes('No GetPracticeHelp check date is on record') && !text.includes('yesterday'));
+});
+
+test('C553: match_practice and search_providers results no longer print the legacy verified badge', async () => {
+  const mk = (extra) => ({ company_name: 'V', category: LAB, city: 'Austin', state_abbr: 'TX', quality_score: 70, verified: 1, slug: 'v-austin-tx', final_score: 80, ...extra });
+  const m = await withFetch(async () => ({ ok: true, json: async () => ({ success: true, matches: [mk()] }) }),
+    () => callTool('match_practice', { category: LAB, state: 'TX' })).then(o => o.content[0].text);
+  assert.ok(!/Verified|\u2713/.test(m), m);
+  const s = (await import('../functions/mcp.js')).renderSearchResult({}, { success: true, providers: [mk()], pagination: { total: 1 } }).content[0].text;
+  assert.ok(!/Verified|\u2713/.test(s), s);
 });
