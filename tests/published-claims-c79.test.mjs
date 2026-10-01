@@ -85,10 +85,11 @@ test('C79-b (all three tools): quality_score 0 / null renders "not yet scored", 
   }
 });
 
-test('C79-b: the verified fragment on the score line is untouched (C79-d is not this lane)', async () => {
+test('C553 s.1: the legacy verified flag no longer prints a badge on the score line (supersedes the C79-d carve-out)', async () => {
   const d = await withFetch({ success: true, provider: { ...ROW, quality_score: 0, verified: 1 } },
     () => callTool('get_provider_detail', { slug: ROW.slug }).then(text));
-  assert.ok(d.includes('**Profile Completeness:** not yet scored ✓ Verified Listing'), d);
+  assert.ok(d.includes('**Profile Completeness:** not yet scored'), d);
+  assert.ok(!/Verified/.test(d) && !d.includes('✓'), 'no verified badge from the legacy flag');
 });
 
 // ---------------------------------------------------------------- C79-a: tool descriptions

@@ -313,7 +313,7 @@ export const TOOLS = [
   {
     name: 'match_practice',
     title: 'Recommend Healthcare Vendors for a Practice',
-    description: `Recommend and rank the best healthcare vendors for a specific medical practice. Use this when a practice manager, physician, or administrator asks for a recommendation, e.g. "recommend a medical billing / RCM company for my practice", "who should I use for credentialing / payer enrollment", "find an EHR for my small [specialty] practice", or "which practice-management software fits a [size] practice in [city, state]". Scores and ranks providers against the practice profile (specialty, size, location, EHR system, budget) and returns up to 5 merit-ranked matches (completeness-scored, no paid placement) with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness -- how many listing fields are filled in -- not a quality or reputation rating; 0 means never scored), final_score (0-100), verified status, description, website, profile_url, slug}. For open-ended browsing without a practice profile, use search_providers. Pass a match's slug to get_provider_detail for the full profile.`,
+    description: `Recommend and rank the best healthcare vendors for a specific medical practice. Use this when a practice manager, physician, or administrator asks for a recommendation, e.g. "recommend a medical billing / RCM company for my practice", "who should I use for credentialing / payer enrollment", "find an EHR for my small [specialty] practice", or "which practice-management software fits a [size] practice in [city, state]". Scores and ranks providers against the practice profile (specialty, size, location, EHR system, budget) and returns up to 5 merit-ranked matches (completeness-scored, no paid placement) with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness -- how many listing fields are filled in -- not a quality or reputation rating; 0 means never scored), final_score (0-100), description, website, profile_url, slug}. For open-ended browsing without a practice profile, use search_providers. Pass a match's slug to get_provider_detail for the full profile.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -361,7 +361,7 @@ export const TOOLS = [
   {
     name: 'search_providers',
     title: 'Search the Healthcare Vendor Directory',
-    description: `Browse and filter the healthcare vendor directory. Use this for open-ended exploration, e.g. "show me medical billing companies in Texas", "list credentialing services", "what EHR vendors are there for cardiology", or when the user wants to page through options rather than get a scored shortlist. Paginated results filtered by category, location, minimum profile-completeness score, curated Tier-1 grade, and practice-size fit; returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), verified status, contact info, slug}. For a scored recommendation to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.`,
+    description: `Browse and filter the healthcare vendor directory. Use this for open-ended exploration, e.g. "show me medical billing companies in Texas", "list credentialing services", "what EHR vendors are there for cardiology", or when the user wants to page through options rather than get a scored shortlist. Paginated results filtered by category, location, minimum profile-completeness score, curated Tier-1 grade, and practice-size fit; returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), contact info, slug}. For a scored recommendation to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -404,7 +404,7 @@ export const TOOLS = [
   {
     name: 'get_provider_detail',
     title: 'Get Vendor Profile Detail',
-    description: `Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to "tell me more about [vendor]", "what services does [vendor] offer", "is [vendor] verified", or wants contact info or services for a specific provider. Returns company_name, category, city/state, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), verified status, description, services offered, practice_size_fit, phone and website where listed, Google rating and Google review count where present, and the profile URL. Where a vendor has been enrichment-extracted, the description, services and practice-size fit come from that extraction, the profile adds certifications and compliance attestations, locations served and founding year where extracted, and the response states the extraction confidence and what it was grounded in (where the extraction abstained on practice-size fit, the legacy listing value is returned and labelled as not extracted); otherwise the legacy listing fields are returned. Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.`,
+    description: `Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to "tell me more about [vendor]", "what services does [vendor] offer", "where did GPH get this information", or wants contact info or services for a specific provider. Returns company_name, category, city/state, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), description, services offered, practice_size_fit, phone and website where listed, Google rating and Google review count where present, a Provenance section that labels each fact GPH-researched, Vendor-supplied, GPH-verified or GPH conclusion with its last-checked date where one exists, and the profile URL. No listing carries a verified badge: the legacy verified flag is not a recorded check and is not shown. Where a vendor has been enrichment-extracted, the description, services and practice-size fit come from that extraction, the profile adds certifications and compliance attestations, locations served and founding year where extracted, and the response states the extraction confidence and what it was grounded in (where the extraction abstained on practice-size fit, the legacy listing value is returned and labelled as not extracted); otherwise the legacy listing fields are returned. Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -576,6 +576,29 @@ export function validateArgs(toolName, args) {
   return null;
 }
 
+// C553 s.2(c): render the API's `fact_provenance` as a Provenance section. Every string it can emit is
+// either written here or one of the closed label / basis strings the API computed; a malformed or
+// absent block renders nothing. The four labels, in the page's own words:
+//   GPH-researched  compiled by GPH from public sources
+//   Vendor-supplied submitted by the vendor and approved by GPH
+//   GPH-verified    confirmed by a GPH check, with the date
+//   GPH conclusion  a GPH classification or computed assessment
+function provenanceSection(fp) {
+  if (!fp || !Array.isArray(fp.facts) || fp.facts.length === 0) return '';
+  const day = d => (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : null);
+  const lines = fp.facts
+    .filter(f => f && typeof f.fact === 'string' && typeof f.label === 'string')
+    .map(f => `- ${f.fact}: ${f.label}${typeof f.basis === 'string' && f.basis ? ` (${f.basis})` : ''}${day(f.checked_at) ? `, last checked ${day(f.checked_at)}` : ''}`);
+  if (!lines.length) return '';
+  const last = day(fp.last_checked);
+  return [
+    '## Provenance',
+    'Each fact below is labelled by how GetPracticeHelp knows it: GPH-researched (compiled from public sources), Vendor-supplied (submitted by the vendor and approved by GPH), GPH-verified (confirmed by a GPH check), or GPH conclusion (a GPH classification or computed assessment).',
+    ...lines,
+    last ? `Last checked: ${last}.` : 'No GetPracticeHelp check date is on record for this listing.',
+  ].join('\n');
+}
+
 export async function callTool(name, args) {
   if (name === 'list_categories') {
     const res = await fetch(`${API_BASE}/categories`);
@@ -608,7 +631,7 @@ export async function callTool(name, args) {
           `${i + 1}. **${m.company_name}**${m.national_label ? ` _(${m.national_label})_` : m.regional_label ? ` _(${m.regional_label})_` : ''}`,
           `   Category: ${m.category}`,
           `   Location: ${m.city || 'National'}, ${m.state_abbr || 'US'}`,
-          `   Profile Completeness: ${profileCompletenessText(m.quality_score)}${m.verified ? ' ✓ Verified' : ''}`,
+          `   Profile Completeness: ${profileCompletenessText(m.quality_score)}`,
           `   Match Score: ${m.final_score}/100`,
           m.description ? `   ${m.description.substring(0, 150)}...` : '',
           m.website ? `   Website: ${m.website}` : '',
@@ -652,7 +675,7 @@ export async function callTool(name, args) {
       `# ${p.company_name}`,
       `**Category:** ${p.category}`,
       `**Location:** ${p.city || 'National'}, ${p.state_abbr || 'US'}`,
-      `**Profile Completeness:** ${profileCompletenessText(p.quality_score)}${p.verified ? ' ✓ Verified Listing' : ''}`,
+      `**Profile Completeness:** ${profileCompletenessText(p.quality_score)}`,
       '',
       // VENDOR-PRO-CODE-01 C1 (GEN100, ALLOC-VP-C1-G100-29, C417-C s.3): "Label vendor-supplied
       // fields as such." Same idiom as the practice-size-fit legacy-source note below --
@@ -705,6 +728,12 @@ export async function callTool(name, args) {
       e.has_enrichment && groundingLabel
         ? `**Profile data:** extracted from public sources (${groundingLabel}).`
         : '',
+      // GPH-AEO-DATA-FIX-01 S2 (C553 s.2(c)): the same labelled facts the provider page shows, read
+      // from the API body's `fact_provenance` (computed once in getpracticehelp
+      // functions/_shared/provenance.js, so page, API and this tool cannot disagree). Absent for a
+      // vendor whose page is inside the experiment fence, and on an API that predates it: nothing is
+      // invented in either case.
+      provenanceSection(p.fact_provenance),
       `**Profile:** https://www.getpracticehelp.com/providers/${p.slug}/`,
     ].filter(Boolean).join('\n');
 
@@ -852,7 +881,7 @@ export function renderSearchResult(args, data) {
     ? 'No providers found matching your criteria.'
     : providers.map((p, i) => [
         `${i + 1}. **${p.company_name}**, ${p.city || 'National'}, ${p.state_abbr || 'US'}`,
-        `   Profile Completeness: ${profileCompletenessText(p.quality_score)}${p.verified ? ' ✓ Verified' : ''}`,
+        `   Profile Completeness: ${profileCompletenessText(p.quality_score)}`,
         `   Category: ${p.category}`,
         p.phone ? `   Phone: ${p.phone}` : '',
         p.website ? `   Website: ${p.website}` : '',
