@@ -1,0 +1,13 @@
+Everything is in order: exactly one committed file, no push performed, `_t3b/` outputs and BRIEF.md remain untracked as instructed.
+
+## Summary
+
+Executed BRIEF.md's T3b scoped repair end-to-end:
+
+1. **Verified the diagnosis independently** — byte-scanned the file and confirmed exactly one raw NUL byte at offset 7649 (a `Mozilla`/NUL/`repeat(4000)` probe on line 143), no other control bytes.
+2. **Fixed it** — replaced the raw NUL with the JS escape for U+0000 (identical string value). `file` now reports UTF-8 text instead of `data`. `node --test`: 17/17, unchanged.
+3. **Mutation test** — built an isolated scratch copy of the classifier + test + fixtures outside the repo (never touched the real `functions/mcp.js`), broke the fallback branch the NUL probe exercises, watched the suite drop to 14/17 — confirming the tests actually discriminate.
+4. **Committed** only `tests/caller-classification.test.mjs` (commit `d48d947`), message citing C409 D2; `git diff d8dec41 --stat` lists exactly that one path.
+5. **Wrote** `_t3b/T3B-TESTFILE.md` and the return JSON at `_t3b/ALLOC-AEO-T3B-G99-81-return.json` (both left uncommitted, per instructions).
+
+One important caveat, flagged as `material_exception: true` in the return: `git diff d8dec41 --numstat` still reports the file as binary even after the fix. That's not a failure of the fix — git's binary-blob detection checks *both* sides of a diff, and the old side (d8dec41) permanently contains the NUL in history. I confirmed this is general git behavior (reproduced it on two disposable throwaway files) and unfixable without rewriting history, which is out of scope here. What the fix does verifiably achieve: the HEAD blob itself is clean UTF-8 with no control bytes, and any diff computed *from* this commit forward renders as normal text with real line counts — I proved this by diffing HEAD's content against a scratch one-line edit. Whether GitHub's PR view of this specific commit renders as text wasn't observable since pushing is out of scope; `result` is set to `NEEDS_VERIFY` accordingly. No push, merge, deploy, network, or secrets were used.

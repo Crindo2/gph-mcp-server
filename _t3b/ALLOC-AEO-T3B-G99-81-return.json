@@ -1,0 +1,37 @@
+{
+  "program_id": "AEO-MEASUREMENT-SPINE-BQ-01",
+  "stage_id": "T3b-CALLER-CLASSIFICATION-REPAIR-AND-DEPLOY",
+  "worker_id": "claude-aeo-t3b-g99-81",
+  "allocation_id": "ALLOC-AEO-T3B-G99-81",
+  "result": "NEEDS_VERIFY",
+  "summary": "Confirmed the controller diagnosis byte-for-byte: tests/caller-classification.test.mjs at d8dec41 held exactly one raw NUL byte (offset 7649, inside a Mozilla/NUL/repeat(4000) probe array on source line 143) and no other control byte. Replaced the raw NUL with the six-character JS escape for U+0000 (same string value), and no other byte in the file. file(1) now reports the path as UTF-8 text, not data. node --test runs 17/17, unchanged. Built an isolated scratch copy of the classifier plus this test and mutated the callerIdentity() fallback branch the NUL probe falls into; the suite dropped to 14/17, proving the tests actually discriminate on that path; the real tracked functions/mcp.js was never touched. Committed only tests/caller-classification.test.mjs on lane/t3b-tests-g99 with a message citing C409 D2; git diff d8dec41 --stat lists exactly that one path. One material caveat: git diff d8dec41 --numstat still reports the pair as binary after the fix, because git's binary-blob heuristic evaluates both sides of a diff and the OLD side (d8dec41's blob) still contains the original NUL forever in history; this is a general git property (reproduced on two throwaway files outside this repo) and cannot be changed without rewriting history, which is out of this allocation's scope. What is fixed and verified: the blob at HEAD contains zero NUL/control bytes, and every diff computed from this commit forward (confirmed against a scratch one-line edit) renders as ordinary text with real line counts. Whether GitHub's PR view specifically now shows this fix commit as non-binary against d8dec41, or shows the file as readable text going forward, was not directly observed because this allocation forbids push/network -- hence NEEDS_VERIFY rather than a clean pass.",
+  "evidence": [
+    {
+      "path": "tests/caller-classification.test.mjs",
+      "sha256": "e000c49eb7d4f341d8ab474dfa3b6a79b0a1328495e5f9627a7567c2b8a76bec"
+    },
+    {
+      "path": "_t3b/T3B-TESTFILE.md",
+      "sha256": "634885e1fc880d63601af6314122dd05053fddc748a9a49d6deaaa78c667ef72"
+    }
+  ],
+  "boundary": "Scoped to the test-file gate only: read the repo, fixed and byte-scanned the one test file, ran the real suite (17/17) and a scratch-copy mutation test outside the repo, committed exactly that one file on the existing lane branch. No push, no merge, no deploy, no migration applied, no network access, no secrets read or written, no email-shaped string introduced or left added, BRIEF.md and this return file were not committed.",
+  "blocker": "none",
+  "material_exception": true,
+  "findings": [
+    "Diagnosis confirmed exactly as stated: one raw NUL byte at offset 7649 in tests/caller-classification.test.mjs (d8dec41), zero other control bytes in the file.",
+    "Fix applied: raw NUL replaced with the six-character JS escape for U+0000, identical string value; file(1) now reports UTF-8 text instead of data; file grew 11712 to 11717 bytes (net +5, as expected for a 1-byte-to-6-byte substitution).",
+    "node --test tests/caller-classification.test.mjs: 17/17 pass after the fix, same as before.",
+    "Mutation test: isolated scratch copy of functions/mcp.js + its _shared import + the test file + its fixture, run outside the repo. Baseline 17/17. Mutated callerIdentity()'s final else-branch (the branch the NUL probe and other unmatched user-agents fall into) from caller_kind unattributed to an invalid value: suite dropped to 14/17 (3 failures), including the exhaustiveness test and a byte-for-byte pin test. Confirms the suite discriminates on the exact path the NUL input exercises. Verified git status/diff on the real functions/mcp.js remained clean throughout, i.e. the mutation never touched the tracked file.",
+    "Material exception: git diff d8dec41 --numstat and --stat still show the file as binary (\"- -\" / Bin NNN -> NNN bytes) after the fix, because git's binary-blob detection is per-blob and the OLD blob at d8dec41 still contains the original NUL byte in history; this is unavoidable without rewriting history, which is out of scope. Reproduced the same git behavior on two disposable non-repo files (one with a raw NUL, one without) to confirm this is general git behavior, not something specific to this fix.",
+    "What the fix does verifiably change: the blob committed at HEAD (d48d947) contains zero NUL or other control bytes, and any diff computed from this commit forward (tested by diffing HEAD's fixed content against a scratch copy with one appended line) renders as an ordinary text diff with real line counts and a normal @@ hunk header, not a binary-files message. GitHub's own rendering of this specific commit against d8dec41, and of the raw file view, was not observed directly since pushing is out of scope for this allocation.",
+    "Commit d48d947 on lane/t3b-tests-g99 contains only tests/caller-classification.test.mjs; git diff d8dec41 --name-only against HEAD lists exactly that one path.",
+    "No email-shaped string was added anywhere in the test file, the _t3b report, or this return. The file's pre-existing redacted/example fixture strings from d8dec41 (an example.invalid address, an example.com address, and Anthropic's own public claudebot contact) were left untouched, as instructed."
+  ],
+  "changed_paths": [
+    "tests/caller-classification.test.mjs"
+  ],
+  "branch_or_worktree": "lane/t3b-tests-g99 @ d48d947b6389b3e6c449a005bd9241779b34c024",
+  "access_mode": "lane commit only; no push; no network; no secrets",
+  "property": "C409 D2 test-file gate"
+}
