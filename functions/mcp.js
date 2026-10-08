@@ -12,6 +12,14 @@
 // /api/match read the other copy, so what this server advertises is what the API filters on.
 import { PRACTICE_SIZE_VOCAB, projectStoredSize, practiceSizeLabel } from './_shared/practice-size-vocab.js';
 
+// C596 B1: copied byte-identically from the supplied getpracticehelp main contract.
+// Its closed codes and labels are pinned by tests/fixtures/match-vocab.lock.json.
+import {
+  ALL_NEED_CODES, VENDOR_GEO_PREFERENCES, STATE_OPTIONAL_PREFERENCES,
+  MAX_SERVICE_NEEDS, MATCH_ARG_ERRORS, parseVendorGeoPreference,
+  NEED_LABEL, EVIDENCE_LABEL, EVIDENCE_SOURCE_LABEL, GEO_BASIS,
+} from './_shared/match-vocab.js';
+
 const API_BASE = 'https://www.getpracticehelp.com/api';
 const AT_BASE = 'appvHqDMSu6aCwNxA';
 const AT_LOG_TABLE = 'tbl5ae8t1PbK2AMkx';
@@ -313,7 +321,7 @@ export const TOOLS = [
   {
     name: 'match_practice',
     title: 'Recommend Healthcare Vendors for a Practice',
-    description: `Recommend and rank the best healthcare vendors for a specific medical practice. Use this when a practice manager, physician, or administrator asks for a recommendation, e.g. "recommend a medical billing / RCM company for my practice", "who should I use for credentialing / payer enrollment", "find an EHR for my small [specialty] practice", or "which practice-management software fits a [size] practice in [city, state]". Scores and ranks providers against the practice profile (specialty, size, location, EHR system, budget) and returns up to 5 merit-ranked matches (completeness-scored, no paid placement) with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness -- how many listing fields are filled in -- not a quality or reputation rating; 0 means never scored), final_score (0-100), description, website, profile_url, slug}. For open-ended browsing without a practice profile, use search_providers. Pass a match's slug to get_provider_detail for the full profile.`,
+    description: `Recommend and rank the best healthcare vendors for a specific medical practice. Use this when a practice manager, physician, or administrator asks for a recommendation, e.g. "recommend a medical billing / RCM company for my practice", "who should I use for credentialing / payer enrollment", "find an EHR for my small [specialty] practice", or "which practice-management software fits a [size] practice in [city, state]". Scores and ranks providers against the practice profile (specialty, size, location, EHR system, budget) and returns up to 5 merit-ranked matches (completeness-scored, no paid placement) with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness -- how many listing fields are filled in -- not a quality or reputation rating; 0 means never scored), final_score (0-100), description, website, profile_url, slug}. Use service_needs to specify up to six controlled service codes for staffing, billing or credentialing; codes must belong to the requested category. Use vendor_geo_preference to prefer local or state vendors, allow national vendors, or request only national or explicitly serves-your-state vendors. State is the practice location and may be omitted only with NATIONAL_OK or NATIONAL_ONLY; category remains required. Capability evidence, geography basis, profile extraction date and service-need coverage are returned where available; missing evidence is unknown, never a verified or paid badge. For open-ended browsing without a practice profile, use search_providers. Pass a match's slug to get_provider_detail for the full profile.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
@@ -331,11 +339,18 @@ export const TOOLS = [
         // C77-c: the closed vocabulary minus 'All' -- asking for "all sizes" is not a size.
         practice_size: { type: 'string', description: 'Size of the practice by provider count. The parameter is named `practice_size`, not `size`.', enum: PRACTICE_SIZE_VOCAB.filter(v => v !== 'All') },
         city: { type: 'string', description: 'City where the practice is located. Send city and state separately, not as a combined `location` string.' },
-        state: { type: 'string', description: "Two-letter state abbreviation (e.g. 'TX', 'CA', 'NY'). Send as `state`, not `state_abbr` (`state_abbr` is an output field name only)." },
+        state: { type: 'string', description: "Practice location as a two-letter state abbreviation (e.g. 'TX', 'CA', 'NY'). Required unless vendor_geo_preference is NATIONAL_OK or NATIONAL_ONLY. Send as `state`, not `state_abbr` (`state_abbr` is an output field name only)." },
         ehr_system: { type: 'string', description: "EHR system used by the practice (e.g. 'Epic', 'athenahealth', 'AdvancedMD', 'eClinicalWorks'). Helps score providers with compatible integrations higher." },
         budget_range: { type: 'string', description: 'Approximate monthly budget', enum: ['Under $500', '$500-$2,000', '$2,000-$5,000', '$5,000+', 'Not sure'] },
+        vendor_geo_preference: { type: 'string', enum: [...VENDOR_GEO_PREFERENCES], description: 'Vendor geography preference, separate from practice location: LOCAL_PREFERRED prefers same-city vendors, STATE_PREFERRED prefers in-state vendors, NATIONAL_OK allows national vendors to compete across geography tiers, and NATIONAL_ONLY restricts eligibility to national or explicitly serves-your-state vendors. State may be omitted for NATIONAL_OK or NATIONAL_ONLY.' },
+        service_needs: { type: 'array', items: { type: 'string', enum: [...ALL_NEED_CODES] }, maxItems: MAX_SERVICE_NEEDS, uniqueItems: true, description: 'Up to six distinct controlled service codes, never free text. STAFFING_* codes apply to Healthcare Staffing & Recruiting, BILLING_* codes to Medical Billing & RCM, and CRED_* codes to Credentialing Services (including aliases). Within a staffing facet codes are alternatives; across facets they ask for combined coverage. Un-evidenced needs are unknown and never exclude a vendor.' },
       },
-      required: ['category', 'state'],
+      required: ['category'],
+      // Category is always required. B1 permits state omission only for these preferences.
+      anyOf: [
+        { required: ['state'] },
+        { required: ['vendor_geo_preference'], properties: { vendor_geo_preference: { enum: [...STATE_OPTIONAL_PREFERENCES] } } },
+      ],
     },
     // outputSchema (task #12 rider, 2026-07-03): documents the EXISTING result shape
     // callTool() already returns below -- additive metadata only, no behavior change.
@@ -537,7 +552,8 @@ export function validateArgs(toolName, args) {
   if (!spec) return null; // unknown tool -> callTool's own "Unknown tool" path handles it
   const props = (spec.inputSchema && spec.inputSchema.properties) || {};
   const valid = Object.keys(props);
-  const required = (spec.inputSchema && spec.inputSchema.required) || [];
+  const required = [...((spec.inputSchema && spec.inputSchema.required) || [])];
+  if (toolName === 'match_practice' && !STATE_OPTIONAL_PREFERENCES.includes(args?.vendor_geo_preference)) required.push('state');
   const a = args || {};
 
   // S4 first: an unrecognized parameter usually explains a missing required one (a caller who
@@ -558,6 +574,22 @@ export function validateArgs(toolName, args) {
       `\n\nValid parameters: ${valid.map(v => `\`${v}\``).join(', ')}.` +
       `\n\nThe call was NOT run. An unrecognized filter is dropped, not applied, so running it would have returned a wider result set than you asked for.`
     );
+  }
+
+  // B1 enum/type validation. Category-specific applicability remains authoritative at /api/match,
+  // which resolves aliases before checking it. Never normalize or rewrite the forwarded fields.
+  if (toolName === 'match_practice') {
+    const geo = parseVendorGeoPreference(a.vendor_geo_preference);
+    if (geo.error) return toolError(`Error: ${geo.error}. The call was NOT run.`);
+    const needs = a.service_needs;
+    let error = null;
+    if (needs != null) {
+      if (!Array.isArray(needs) || needs.some(v => typeof v !== 'string')) error = MATCH_ARG_ERRORS.service_needs_type;
+      else if (needs.length > MAX_SERVICE_NEEDS) error = MATCH_ARG_ERRORS.service_needs_size;
+      else if (needs.some(v => !ALL_NEED_CODES.includes(v))) error = MATCH_ARG_ERRORS.service_needs_unknown;
+      else if (new Set(needs).size !== needs.length) error = MATCH_ARG_ERRORS.service_needs_duplicate;
+    }
+    if (error) return toolError(`Error: ${error}. The call was NOT run.`);
   }
 
   // S3: declared-required enforcement.
@@ -599,6 +631,42 @@ function provenanceSection(fp) {
   ].join('\n');
 }
 
+// B1 public explanation uses constant labels, never stored evidence text or legacy verified.
+const matchLabel = (map, code) => typeof code === 'string' && Object.prototype.hasOwnProperty.call(map, code) ? map[code] : null;
+const matchDay = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+  Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value ? value : null;
+
+function matchEvidenceLines(m) {
+  const lines = [];
+  if (Array.isArray(m.why_matched)) {
+    for (const w of m.why_matched.slice(0, MAX_SERVICE_NEEDS)) {
+      if (!w || typeof w !== 'object') continue;
+      const need = matchLabel(NEED_LABEL, w.need);
+      const evidence = matchLabel(EVIDENCE_LABEL, w.evidence);
+      const source = matchLabel(EVIDENCE_SOURCE_LABEL, w.source);
+      if (!need || !evidence || !source) continue;
+      // Confidence and grounding refer only to enrichment extraction, not vendor claims.
+      const confidence = w.source === 'enriched' ? CONFIDENCE_LABELS.get(w.confidence) : null;
+      const grounding = w.source === 'enriched' ? GROUNDED_IN_LABELS.get(w.grounded_in) : null;
+      lines.push(`   Why matched: ${need} -- ${evidence}; ${source}${confidence ? `; extraction confidence ${confidence}` : ''}${grounding ? `; grounded in ${grounding}` : ''}.`);
+    }
+    if (!lines.length) lines.push('   Service-need evidence: unknown for this vendor.');
+  }
+  const geo = matchLabel(GEO_BASIS, m.geo_basis);
+  if (geo) lines.push(`   Geography basis: ${geo}.`);
+  const checked = matchDay(m.evidence_checked);
+  if (checked) lines.push(`   Profile extraction date: ${checked}.`);
+  const provenance = provenanceSection(m.fact_provenance);
+  if (provenance) lines.push(provenance);
+  return lines;
+}
+
+function matchNeedsSummary(summary) {
+  if (!summary || !['requested', 'evidenced_any', 'unknown'].every(k => Number.isInteger(summary[k]) && summary[k] >= 0) ||
+      summary.requested > MAX_SERVICE_NEEDS || summary.evidenced_any + summary.unknown !== summary.requested) return '';
+  return `Service-need coverage across the API shortlist (up to 10 providers): ${summary.evidenced_any}/${summary.requested} requested codes evidenced; ${summary.unknown} unknown. Missing evidence is unknown, not proof that a service is unavailable.\n\n`;
+}
+
 export async function callTool(name, args) {
   if (name === 'list_categories') {
     const res = await fetch(`${API_BASE}/categories`);
@@ -633,6 +701,7 @@ export async function callTool(name, args) {
           `   Location: ${m.city || 'National'}, ${m.state_abbr || 'US'}`,
           `   Profile Completeness: ${profileCompletenessText(m.quality_score)}`,
           `   Match Score: ${m.final_score}/100`,
+          ...matchEvidenceLines(m),
           m.description ? `   ${m.description.substring(0, 150)}...` : '',
           m.website ? `   Website: ${m.website}` : '',
           `   Profile: https://www.getpracticehelp.com/providers/${m.slug}/`,
@@ -644,7 +713,7 @@ export async function callTool(name, args) {
     // per-row label line above and in match.js's own geoHonestyNote computation.
     const honestyPrefix = data.geo_honesty_note ? `_${data.geo_honesty_note}_\n\n` : '';
 
-    return { content: [{ type: 'text', text: `${honestyPrefix}Found ${data.total || matches.length} providers. Top ${matches.length} matches:\n\n${text}` }], count: data.total ?? matches.length, ids: { surfaced: matches.map(m => m.slug).filter(Boolean) } };
+    return { content: [{ type: 'text', text: `${honestyPrefix}${matchNeedsSummary(data.needs_summary)}Found ${data.total || matches.length} providers. Top ${matches.length} matches:\n\n${text}` }], count: data.total ?? matches.length, ids: { surfaced: matches.map(m => m.slug).filter(Boolean) } };
   }
 
   if (name === 'search_providers') {
@@ -1509,6 +1578,11 @@ export async function buildTelemetry(server, request, env, toolName, args, resul
     practice_size: a.practice_size || null,
     budget_range: a.budget_range || null,
     practice_size_fit: a.practice_size_fit || null,
+    // C596 s.4: closed structured B1 dimensions; historical rows remain NULL.
+    vendor_geo_preference: server === 'gph' && toolName === 'match_practice' && VENDOR_GEO_PREFERENCES.includes(a.vendor_geo_preference) ? a.vendor_geo_preference : null,
+    service_needs: server === 'gph' && toolName === 'match_practice' && Array.isArray(a.service_needs) &&
+      a.service_needs.length <= MAX_SERVICE_NEEDS && a.service_needs.every(v => ALL_NEED_CODES.includes(v)) &&
+      new Set(a.service_needs).size === a.service_needs.length ? JSON.stringify(a.service_needs) : null,
     field_completeness: computeFieldCompleteness(server, toolName, a),
     demand_cell: demandCell(server, a),
     vendor_surfaced: (ids && ids.surfaced && ids.surfaced.length) ? JSON.stringify(ids.surfaced) : null,
@@ -1534,6 +1608,8 @@ export const TELEMETRY_D1_M1_COLUMNS = ['traffic_class', 'cache_status'];
 // Added by migrations/2026_09_25_mcp_usage_log_caller_kind_agent_intent_caller_agent.sql
 // (T3-CALLER-CLASSIFICATION-REPAIR, ALLOC-AEO-SPINE-T3-G99-34; ADD COLUMN only).
 export const TELEMETRY_D1_M2_COLUMNS = ['caller_kind', 'agent_intent', 'caller_agent'];
+// C596 B1 (additive; migration included for controller review, not applied by this build).
+export const TELEMETRY_D1_B1_COLUMNS = ['vendor_geo_preference', 'service_needs'];
 
 function insertTelemetry(db, rec, columns) {
   return db.prepare(
@@ -1550,6 +1626,7 @@ function insertTelemetry(db, rec, columns) {
 // deploy that lands before its migration degrades to the next-narrower shape instead of losing
 // the row.
 const TELEMETRY_D1_COLUMN_TIERS = [
+  [...TELEMETRY_D1_BASE_COLUMNS, ...TELEMETRY_D1_M1_COLUMNS, ...TELEMETRY_D1_M2_COLUMNS, ...TELEMETRY_D1_B1_COLUMNS],
   [...TELEMETRY_D1_BASE_COLUMNS, ...TELEMETRY_D1_M1_COLUMNS, ...TELEMETRY_D1_M2_COLUMNS],
   [...TELEMETRY_D1_BASE_COLUMNS, ...TELEMETRY_D1_M1_COLUMNS],
   TELEMETRY_D1_BASE_COLUMNS,

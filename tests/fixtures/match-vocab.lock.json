@@ -1,0 +1,8 @@
+{
+  "contract": "C596-MATCH-VOCAB",
+  "module": "functions/_shared/match-vocab.js",
+  "sha256_lf": "3d27cdbb3498594f586102897fff969c075fd261bbeb22f4cfb4548466fe53e7",
+  "why": "The C596 buyer-need vocabulary module is copied byte-identically into Crindo2/gph-mcp-server in a later stage. This lock pins the getpracticehelp copy so a drift is visible: tests/match-vocab.test.mjs fails when the module changes without this hash.",
+  "draft": "Billing and credentialing synonym lists are DRAFT until scripts/match-benchmark/vocab_frequency.sql has been run read-only and its counts reviewed.",
+  "authority": "Program GPH-MCP-SERVING-01-C596-DESIGN, stage C596-B1-MATCH-BUILD, allocation ALLOC-C596-B1-BUILD-G110-01"
+}
