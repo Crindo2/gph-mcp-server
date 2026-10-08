@@ -11,6 +11,7 @@
 // match_practice enums and the get_provider_detail size line read it; /api/search and
 // /api/match read the other copy, so what this server advertises is what the API filters on.
 import { PRACTICE_SIZE_VOCAB, projectStoredSize, practiceSizeLabel } from './_shared/practice-size-vocab.js';
+import { checkNameArg, NAME_RESULT_CAP } from './_shared/name-lookup.js';
 
 // C596 B1: copied byte-identically from the supplied getpracticehelp main contract.
 // Its closed codes and labels are pinned by tests/fixtures/match-vocab.lock.json.
@@ -376,12 +377,13 @@ export const TOOLS = [
   {
     name: 'search_providers',
     title: 'Search the Healthcare Vendor Directory',
-    description: `Browse and filter the healthcare vendor directory. Use this for open-ended exploration, e.g. "show me medical billing companies in Texas", "list credentialing services", "what EHR vendors are there for cardiology", or when the user wants to page through options rather than get a scored shortlist. Paginated results filtered by category, location, minimum profile-completeness score, curated Tier-1 grade, and practice-size fit; returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), contact info, slug}. For a scored recommendation to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.`,
+    description: `Browse and filter the healthcare vendor directory. Use this for open-ended exploration, e.g. "show me medical billing companies in Texas", "list credentialing services", "what EHR vendors are there for cardiology", or when the user wants to page through options rather than get a scored shortlist. To check whether one named vendor is listed and get its slug, pass \`name\` (public company name only, e.g. "is Revive Health Partners listed?"): a case- and punctuation-insensitive contains/prefix match returning up to ${NAME_RESULT_CAP} vendors in one page, combinable with the filters below, with \`category\` optional; the name is never stored. Paginated results filtered by category, location, minimum profile-completeness score, curated Tier-1 grade, and practice-size fit; returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), contact info, slug}. For a scored recommendation to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: {
       type: 'object',
       properties: {
-        category: { type: 'string', description: `Service category to search. One of the 25 categories: ${CATEGORY_LIST_TEXT}. Common aliases also resolve (e.g. 'billing', 'RCM', 'EHR', 'credentialing'). Call list_categories for the live list with provider counts. This tool does NOT accept a specialty filter -- use match_practice for specialty-aware ranking.` },
+        name: { type: 'string', maxLength: 100, description: `Vendor company name to look up (public company names only; never a practice, person, email, phone number or NPI). Matched case- and punctuation-insensitively, contains or prefix (e.g. 'revive health' finds 'Revive Health Partners, LLC'). Returns at most ${NAME_RESULT_CAP} vendors, prefix matches first, in a single page (page and per_page do not apply). Combinable with category, state, city and the other filters. When name is given, category is optional. The submitted name is never stored or logged; GPH records only the matched slugs and the result count. Max 100 characters.` },
+        category: { type: 'string', description: `Service category to search. Required unless \`name\` is given. One of the 25 categories: ${CATEGORY_LIST_TEXT}. Common aliases also resolve (e.g. 'billing', 'RCM', 'EHR', 'credentialing'). Call list_categories for the live list with provider counts. This tool does NOT accept a specialty filter -- use match_practice for specialty-aware ranking.` },
         state: { type: 'string', description: "Two-letter state abbreviation (e.g. 'TX'). Send as `state`, not `state_abbr` (`state_abbr` is an output field name only). National providers always included." },
         city: { type: 'string', description: "City to filter by. Matches one exact city only: the value is compared as a city slug (case and punctuation ignored, e.g. 'San Antonio' matches 'san-antonio'); partial names and prefixes do not match." },
         min_rating: { type: 'number', description: 'Minimum profile-completeness score (0-100; how many listing fields are filled in, not a quality or reputation rating). Most providers score 50-85. The parameter is named `min_rating`, not `min_quality_score`.', minimum: 0, maximum: 100 },
@@ -393,7 +395,7 @@ export const TOOLS = [
         per_page: { type: 'number', description: 'Results per page (1-25, default 10)', minimum: 1, maximum: 25, default: 10 },
         page: { type: 'number', description: 'Page number for pagination (default 1)', minimum: 1, default: 1 },
       },
-      required: ['category'],
+      required: [], // category is required unless `name` is given -- enforced in validateArgs
     },
     // outputSchema (task #12 rider, 2026-07-03): documents the EXISTING result shape
     // callTool() already returns below -- additive metadata only, no behavior change.
@@ -555,6 +557,8 @@ export function validateArgs(toolName, args) {
   const required = [...((spec.inputSchema && spec.inputSchema.required) || [])];
   if (toolName === 'match_practice' && !STATE_OPTIONAL_PREFERENCES.includes(args?.vendor_geo_preference)) required.push('state');
   const a = args || {};
+  // C710 s.2: search_providers needs a category unless it is a vendor-name lookup.
+  if (toolName === 'search_providers' && a.name == null) required.push('category');
 
   // S4 first: an unrecognized parameter usually explains a missing required one (a caller who
   // sent `need` instead of `category` is failing both checks for one reason), so naming the
@@ -590,6 +594,12 @@ export function validateArgs(toolName, args) {
       else if (new Set(needs).size !== needs.length) error = MATCH_ARG_ERRORS.service_needs_duplicate;
     }
     if (error) return toolError(`Error: ${error}. The call was NOT run.`);
+  }
+
+  // C710 s.2: public-vendor-name guards. The error text never echoes the submitted name.
+  if (toolName === 'search_providers' && a.name != null) {
+    const checked = checkNameArg(a.name);
+    if (!checked.ok) return toolError(`Error: ${checked.error}. The call was NOT run.`);
   }
 
   // S3: declared-required enforcement.
@@ -870,6 +880,7 @@ export function searchUpstreamParams(args = {}) {
   if (args.min_rating) params.set('min_rating', args.min_rating);
   if (args.tier1_grade) params.set('tier1_grade', args.tier1_grade);
   if (args.practice_size_fit) params.set('practice_size_fit', args.practice_size_fit);
+  if (args.name != null) params.set('name', args.name);
   params.set('per_page', Math.min(args.per_page || 10, ROW_CEILING));
   params.set('page', args.page || 1);
   return params;
@@ -902,6 +913,9 @@ export function searchCacheKey(args = {}) {
 // Returns { data, cacheStatus } where cacheStatus is 'hit' | 'miss' | 'bypass'.
 // `cache` is a Cache-API-shaped store ({ match, put }) or null; `now` is epoch ms.
 export async function fetchSearchData(args = {}, { cache = null, now = Date.now(), waitUntil = null } = {}) {
+  // C710 s.2: a name lookup never touches the read cache. The key ignores `name` (a hit would answer
+  // with another query's rows) and must never carry the submitted text.
+  if (args.name != null) cache = null;
   let cacheStatus = cache ? 'miss' : 'bypass';
   let keyRequest = null;
   if (cache) {
@@ -946,6 +960,7 @@ export function renderSearchResult(args, data) {
   if (!data.success) return { content: [{ type: 'text', text: `Search failed: ${data.error || 'Unknown error'}` }], isError: true };
 
   const providers = data.providers || [];
+  const isNameLookup = args.name != null;
   const text = providers.length === 0
     ? 'No providers found matching your criteria.'
     : providers.map((p, i) => [
@@ -954,9 +969,15 @@ export function renderSearchResult(args, data) {
         `   Category: ${p.category}`,
         p.phone ? `   Phone: ${p.phone}` : '',
         p.website ? `   Website: ${p.website}` : '',
+        // C710 s.2: the point of a name lookup is "is it listed, and what is its slug?"
+        isNameLookup && p.slug ? `   Slug: ${p.slug}` : '',
       ].filter(Boolean).join('\n')).join('\n\n');
 
   const totalResults = data.pagination?.total ?? data.total ?? providers.length;
+  if (isNameLookup) {
+    const more = data.pagination?.capped ? `\n\nMore than ${NAME_RESULT_CAP} vendors match this name; showing the first ${NAME_RESULT_CAP}. Add more of the name or a filter (category, state, city) to narrow.` : '';
+    return { content: [{ type: 'text', text: `${totalResults} vendor${totalResults === 1 ? '' : 's'} matching that name:\n\n${text}${more}` }], count: totalResults, ids: { surfaced: providers.map(p => p.slug).filter(Boolean) } };
+  }
   return { content: [{ type: 'text', text: `${totalResults} total results (page ${args.page || 1}):\n\n${text}` }], count: totalResults, ids: { surfaced: providers.map(p => p.slug).filter(Boolean) } };
 }
 
@@ -1530,10 +1551,20 @@ async function deriveSessionId(request, env) {
 export async function buildTelemetry(server, request, env, toolName, args, resultsCount, tier, ids, cacheStatus = null) {
   const ua = request.headers.get('user-agent') || '';
   const originHost = originHostOf(request);
-  const step = funnelStep(toolName);
   const rc = (typeof resultsCount === 'number') ? resultsCount : null;
+  let a = args || {};
+  // C710 s.2: a search_providers name lookup is its own tool dimension, never category demand, and the
+  // submitted name is never retained. Every row built for such a call (served, refused by validation,
+  // refused by the rate valve) is rebuilt from slugs + count alone, so no downstream sink -- raw_args,
+  // search_term, demand_cell, either D1 tier or the Airtable mirror -- can see the text or the filters.
+  const nameLookup = server === 'gph' && toolName === 'search_providers' && a.name != null;
+  if (nameLookup) {
+    a = {};
+    ids = ids && ids.surfaced ? { surfaced: ids.surfaced } : null;
+  }
+  // A name lookup is a reference lookup, not discover demand: "not listed" (0 rows) is an answer, not a zero_result.
+  const step = nameLookup ? 'reference' : funnelStep(toolName);
   const zero = (step !== 'reference' && rc === 0) ? 1 : 0;
-  const a = args || {};
   const who = callerIdentity(ua, originHost);
   return {
     ts: new Date().toISOString(),
@@ -1583,13 +1614,15 @@ export async function buildTelemetry(server, request, env, toolName, args, resul
     service_needs: server === 'gph' && toolName === 'match_practice' && Array.isArray(a.service_needs) &&
       a.service_needs.length <= MAX_SERVICE_NEEDS && a.service_needs.every(v => ALL_NEED_CODES.includes(v)) &&
       new Set(a.service_needs).size === a.service_needs.length ? JSON.stringify(a.service_needs) : null,
-    field_completeness: computeFieldCompleteness(server, toolName, a),
-    demand_cell: demandCell(server, a),
+    field_completeness: nameLookup ? null : computeFieldCompleteness(server, toolName, a),
+    demand_cell: nameLookup ? null : demandCell(server, a),
     vendor_surfaced: (ids && ids.surfaced && ids.surfaced.length) ? JSON.stringify(ids.surfaced) : null,
     vendor_drilled: (ids && ids.drilled) ? ids.drilled : null,
-    raw_args: JSON.stringify(a),
+    raw_args: nameLookup
+      ? JSON.stringify({ dimension: 'name_lookup', matched_slugs: (ids && ids.surfaced) || [], count: rc })
+      : JSON.stringify(a),
     // GPH-MCP-SERVING-01 M1 (additive; migrations/2026_09_16_mcp_usage_log_traffic_class_cache_status.sql)
-    traffic_class: server === 'gph' ? classifyTrafficClass(toolName, a) : null,
+    traffic_class: nameLookup ? 'reference' : (server === 'gph' ? classifyTrafficClass(toolName, a) : null),
     cache_status: cacheStatus || null,
   };
 }
