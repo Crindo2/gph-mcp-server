@@ -598,3 +598,25 @@ test('C553: match_practice and search_providers results no longer print the lega
   const s = (await import('../functions/mcp.js')).renderSearchResult({}, { success: true, providers: [mk()], pagination: { total: 1 } }).content[0].text;
   assert.ok(!/Verified|\u2713/.test(s), s);
 });
+
+// C812 s.3: exercise the real tools/call -> telemetry -> D1 INSERT path.
+for (const hasM1Columns of [true, false]) {
+  test(`C812: internal caller_class reaches D1 (M1 columns: ${hasM1Columns})`, async () => {
+    const env = envWith({ db: fakeD1({ hasM1Columns }) });
+    const upstream = mockUpstream();
+    await quiet(() => withFetch(upstream.fetchFn, async () => {
+      for (const ua of ['openai-mcp/1.0.0 (Codex)', 'cbeg-g61-zerocat-probe/1.0', 'verify-fix-organic']) {
+        const request = fakeRequest('203.0.113.7', ua);
+        request.headers.set('Origin', 'https://chatgpt.com');
+        const out = await mcpCall(env, request, 'search_providers', { category: LAB, state: 'TX' });
+        assert.equal(out.isError, undefined);
+        assert.equal(out.count, 3536);
+        assert.deepEqual(Object.keys(out).sort(), ['content', 'count', 'ids']);
+      }
+    }));
+    assert.equal(env.TELEMETRY_DB.rows.length, 3);
+    assert.ok(env.TELEMETRY_DB.rows.every(row => row.caller_class === 'internal'));
+    assert.ok(env.TELEMETRY_DB.rows.every(row => row.results_count === 3536));
+    if (hasM1Columns) assert.ok(env.TELEMETRY_DB.rows.every(row => row.traffic_class === 'demand'));
+  });
+}
