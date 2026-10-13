@@ -1265,16 +1265,16 @@ function assistantChannel(ua, originHost) {
 }
 
 export function classifyCaller(ua, originHost) {
-  if (assistantFromOrigin(originHost)) return 'organic_assistant';
   const u = (ua || '').trim();
+  // C812 s.3: estate-owned clients are internal, even with an assistant Origin or probe UA.
+  // cbeg-* identifies our harness; verify-fix-organic is the literal test in the corpus.
+  // Bare openai-mcp and Claude-User are not evidence of estate ownership.
+  if (/^(?:openai-mcp\/1\.0\.0 \(Codex\)|cbeg-)|^verify-fix-organic$/i.test(u)) return 'internal';
+  if (assistantFromOrigin(originHost)) return 'organic_assistant';
   if (!u) return 'unknown';
   if (/probe|listability|uptime|pingdom|healthcheck|statuscake|\bmonitor\b/i.test(u)) return 'directory_probe';
-  // SR-UA fix (2026-07-03): self_test requires a self-identifying cbeg-* UA (our
-  // own harness, e.g. cbeg-floor-check). A generic HTTP client (python-httpx,
-  // curl, wget, node-fetch, axios, ...) is EXTERNAL programmatic traffic, not our
-  // test -- it must not be hidden as self_test. It falls through to known_crawler
-  // below, which the nightly rollup excludes from organic (honest, not organic).
-  if (/^cbeg-/i.test(u)) return 'self_test';
+  // SR-UA: generic HTTP clients are external programmatic traffic, not our harness.
+  // They fall through to known_crawler; the estate's cbeg-* harness is internal above.
   // T3-CALLER-CLASSIFICATION-REPAIR (ALLOC-AEO-SPINE-T3-G99-34). The documented AI *crawlers*
   // (GPTBot, OAI-SearchBot, ClaudeBot, anthropic-ai, PerplexityBot, ...) carry a vendor name
   // that `assistantFromUA` matches below, so an index crawl returned 'organic_assistant'. This
@@ -1308,7 +1308,9 @@ export function classifyCaller(ua, originHost) {
 //      'unknown' meant "could be a person, could be a scanner" -- which is how a machine count
 //      off this endpoint got read as organic search traffic.
 //
-// THE REPAIR IS ADDITIVE AND FORWARD-ONLY. `caller_class` is NOT redefined: demand_rollup, the
+// T3 REPAIR WAS ADDITIVE AND FORWARD-ONLY. C812 s.3 now overrides estate-owned
+// caller_class values with internal; the identity dimensions below remain unchanged.
+// At T3, `caller_class` was NOT redefined: demand_rollup, the
 // nightly rollup and the Airtable single-select all key off its existing values. Three new
 // recorded dimensions carry the honest split, fixtured against all 43 distinct user-agents in
 // the production corpus in tests/caller-classification.test.mjs:
@@ -1374,8 +1376,8 @@ function matchAgentTable(table, ua) {
   return null;
 }
 
-// The honest caller split. Returns caller_class/assistant_channel UNCHANGED (nothing
-// downstream moves) plus the three new dimensions.
+// The honest caller split. caller_class follows classifyCaller (including C812 internal);
+// assistant_channel and the three T3 identity dimensions retain their existing rules.
 export function callerIdentity(ua, originHost) {
   const u = String(ua == null ? '' : ua).trim();
   const caller_class = classifyCaller(u, originHost);
@@ -1542,7 +1544,7 @@ export async function buildTelemetry(server, request, env, toolName, args, resul
     caller_class: who.caller_class,
     assistant_channel: who.assistant_channel,
     // T3-CALLER-CLASSIFICATION-REPAIR (ALLOC-AEO-SPINE-T3-G99-34): additive, forward-only.
-    // caller_class above is UNCHANGED -- these three carry the honest human/dev-tool/bot split
+    // C812 internal is carried by caller_class above; these retain the human/dev-tool/bot split.
     // caller_class cannot express. See callerIdentity() for the full defect writeup.
     caller_kind: who.caller_kind,
     agent_intent: who.agent_intent,

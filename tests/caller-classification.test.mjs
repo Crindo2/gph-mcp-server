@@ -4,8 +4,8 @@
 // GPH MCP API logs because no figure could state what it measured: the log's only identity
 // dimension was `caller_class`, whose "organic" value was 99.2% OpenAI developer tooling and
 // which had no human class at all. This file is the standing proof that the replacement
-// dimensions say what they claim AND that the legacy series did not move underneath the
-// downstream rollups while they were added.
+// dimensions say what they claim. C812 s.3 changes caller_class only for known estate-owned
+// clients; the historical legacy pin stays in the corpus for before/after evidence.
 //
 // The fixture is the WHOLE production corpus -- all 43 distinct user-agents over 3,922 rows
 // in D1 e8605bbb, read 2026-09-11, not a sample. A classifier tested only against invented
@@ -26,13 +26,13 @@ const KINDS = new Set(['human', 'model_agent', 'bot', 'self_test', 'unattributed
 const INTENTS = new Set(['end_user', 'dev_tool']);
 
 // ---------------------------------------------------------------------------------------
-// 1. THE REGRESSION FENCE: the legacy series must not move.
+// 1. THE REGRESSION FENCE: only C812 estate-owned caller classes may move.
 // ---------------------------------------------------------------------------------------
 
-test('legacy caller_class is unchanged for every user-agent in the production corpus', () => {
+test('caller_class matches the corpus with only explicit C812 internal overrides', () => {
   for (const a of CORPUS.agents) {
     assert.equal(
-      classifyCaller(a.ua, ''), a.legacy_class,
+      classifyCaller(a.ua, ''), a.caller_class || a.legacy_class,
       `caller_class moved for ${JSON.stringify(a.ua)} (${a.rows} rows). The nightly rollup, ` +
       'demand_rollup and the Airtable single-select all key off this value.'
     );
@@ -225,4 +225,39 @@ test('the corpus, cut on the new dimension, states what it measures', () => {
     CORPUS.total_rows,
     'the split must account for every row in the corpus -- an unexhausted split is the defect'
   );
+});
+
+// C812 s.3: internal takes priority over assistant Origin and probe tokens.
+test('C812: known estate callers are internal with or without an assistant Origin', () => {
+  const own = ['openai-mcp/1.0.0 (Codex)', 'openai-mcp/1.0.0 (Codex) seat/1.0',
+    'OPENAI-MCP/1.0.0 (CODEX)', ' cbeg-floor-check ', 'cbeg-g61-zerocat-probe/1.0',
+    'cbeg-claude-probe/1.0', 'verify-fix-organic'];
+  for (const ua of own) for (const origin of ['', 'chatgpt.com', 'claude.ai']) {
+    assert.equal(classifyCaller(ua, origin), 'internal', ua);
+    assert.equal(callerIdentity(ua, origin).caller_class, 'internal', ua);
+  }
+});
+
+test('C812: other assistant clients are not assumed estate-owned', () => {
+  for (const ua of ['openai-mcp/1.0.0', 'Claude-User',
+    'other openai-mcp/1.0.0 (Codex)', 'openai-mcp/1.0.0 (Codex-like)']) {
+    assert.equal(classifyCaller(ua, ''), 'organic_assistant', ua);
+  }
+  assert.equal(classifyCaller('codex-cli/1.0', ''), 'unknown');
+  assert.equal(classifyCaller('verify-fix-organic-external', ''), 'unknown');
+  assert.equal(classifyCaller('external-cbeg-probe', ''), 'directory_probe');
+});
+
+test('C812: corpus counts separate internal traffic from the organic rollup input', () => {
+  const byClass = {};
+  for (const a of CORPUS.agents) {
+    const value = classifyCaller(a.ua, '');
+    byClass[value] = (byClass[value] || 0) + a.rows;
+    if (value !== 'internal') assert.equal(value, a.legacy_class);
+  }
+  assert.equal(byClass.internal, 610);
+  assert.equal(byClass.organic_assistant, 239);
+  assert.equal(Object.values(byClass).reduce((a, b) => a + b, 0), CORPUS.total_rows);
+  assert.ok([...Object.keys(byClass)].every(c =>
+    ['internal', 'organic_assistant', 'known_crawler', 'directory_probe', 'self_test', 'unknown'].includes(c)));
 });

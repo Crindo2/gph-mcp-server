@@ -80,13 +80,66 @@ Workers KV is eventually consistent. It allows at most 1 write per second to the
 
 ## Telemetry: caller_kind, agent_intent, caller_agent
 
-`mcp_usage_log` gains three more nullable columns in `migrations/2026_09_25_mcp_usage_log_caller_kind_agent_intent_caller_agent.sql` (T3-CALLER-CLASSIFICATION-REPAIR, ALLOC-AEO-SPINE-T3-G99-34). Additive; `caller_class` is unchanged and still drives the legacy rollup.
+`mcp_usage_log` gains three more nullable columns in `migrations/2026_09_25_mcp_usage_log_caller_kind_agent_intent_caller_agent.sql` (T3-CALLER-CLASSIFICATION-REPAIR, ALLOC-AEO-SPINE-T3-G99-34). The T3 migration is additive; C812 s.3 separately updates the caller_class rule below.
 
 - **The defect this repairs:** `caller_class`'s `organic_assistant` value is the one the nightly rollup reads as organic demand, but it cannot distinguish a person asking an assistant from a developer's own agent tooling calling the server (e.g. the OpenAI Codex CLI, which sends a UA `assistantFromUA` matches). It also has no `human` value at all -- a real browser UA falls through to `unknown` alongside generic HTTP clients.
 - `caller_kind`: `human` | `model_agent` | `bot` | `self_test` | `unattributed`, set at write time by `callerIdentity()` in `functions/mcp.js`. Exhaustive and mutually exclusive -- the only dimension a published demand figure should be cut on. `unattributed` asserts identity could not be established; it is deliberately not `unknown`, which reads as maybe-human.
 - `agent_intent`: `end_user` | `dev_tool`, set only when `caller_kind = 'model_agent'`; NULL otherwise. `dev_tool` is a developer's own agent runtime (Codex, Claude Code, Cursor, an SDK, ...) and must be excluded from any organic/end-user demand figure.
 - `caller_agent`: the normalized, sanitised product token (e.g. `openai-codex`, `claude-user`, `browser`), bounded to 40 chars and never raw user-agent text.
 - Network-free and deterministic at write time (UA + Origin only), like `traffic_class`. Historical rows are backfillable by the identical rules (M3-style, not run here).
-- **Gate:** `tests/caller-classification.test.mjs`, 17 tests fixtured on all 43 distinct user-agents in the production `mcp_usage_log` corpus (3,922 rows, read 2026-09-11) -- including a pin that legacy `caller_class` has not moved for any of them.
+- **Gate:** `tests/caller-classification.test.mjs`, 17 tests fixtured on all 43 distinct user-agents in the production `mcp_usage_log` corpus (3,922 rows, read 2026-09-11) -- including historical legacy pins and explicit C812 `internal` overrides; other caller classes and all T3 identity dimensions retain their rules.
 - Airtable mirror gains `Caller Kind`, `Agent Intent`, `Caller Agent`. `typecast` auto-creates a missing select *option* but not a missing *field* -- an unknown field name 422s the whole record -- so `logToolCall` retries once with the stable core alone on `UNKNOWN_FIELD_NAME` and logs it. A schema lag costs the three new columns, never the row.
 - **Apply order:** either order is safe. `writeTelemetryD1` tries columns widest-first (base + M1 + this migration) and falls back a tier at a time on "no column named", so deploying before applying loses only the newest labels, never the row.
+
+## Telemetry: internal caller_class (C812 s.3)
+
+`caller_class` values are `internal` | `organic_assistant` | `known_crawler` |
+`directory_probe` | `self_test` | `unknown`. The existing TEXT column accepts `internal`;
+no column migration or access gate is added. D1 and the Airtable mirror receive the
+same write-time value through the existing telemetry path (Airtable uses typecast).
+
+After trimming the UA, the case-insensitive internal rule matches:
+- the prefix `openai-mcp/1.0.0 (Codex)` (including appended seat/version text);
+- the prefix `cbeg-`, which the existing code identifies as our own harness, including probes;
+- exactly `verify-fix-organic`, identified as a literal test by the code and corpus.
+
+This rule runs before assistant Origin, probe and assistant UA classification. It affects
+caller_class only: caller_kind, agent_intent, caller_agent and traffic_class keep their rules.
+Bare `openai-mcp/1.0.0` remains `organic_assistant`: dev_tool identifies a runtime, not estate
+ownership. `Claude-User` remains `organic_assistant` with end_user intent. Generic HTTP
+clients and other developer tooling are not assumed ours.
+
+The nightly rollup's organic input is `caller_class = 'organic_assistant'`; internal rows
+must be excluded even when traffic_class is demand. Existing ingestion and historical-sweep
+exclusions still apply. No rollup source or enum is in this repository: the controller must
+verify cbeg-mcp-rollup's organic filter and any closed caller_class lists accept/exclude internal.
+No downstream deployment or natural-run acceptance is claimed by this server build.
+
+Historical reclassification is ONE parameterized UPDATE, provided for the controller only:
+
+```sql
+-- C812 s.3; controller-only historical reclassification. NOT EXECUTED on D1.
+-- Bind ?1='internal', ?2='openai-mcp/1.0.0 (Codex)%', ?3='cbeg-%', ?4='verify-fix-organic'.
+-- SQLite/D1 default LIKE is ASCII case-insensitive, matching the UA rule.
+-- TRIM removes surrounding spaces, as at write time; HTTP header values are normalized.
+UPDATE mcp_usage_log
+SET caller_class = ?1
+WHERE (TRIM(user_agent) LIKE ?2
+    OR TRIM(user_agent) LIKE ?3
+    OR TRIM(user_agent) LIKE ?4)
+  AND (caller_class IS NULL OR caller_class <> ?1);
+```
+
+Expected matches in the supplied 2026-09-11 corpus: **610 rows** = 433 Codex + 176 cbeg
+harness + 1 verify-fix-organic. All 610 need changing on the original corpus, and a repeat
+update changes 0. The retained legacy UA-only organic count is 672; after C812 it is 239.
+The corpus notes that verify-fix-organic's stored class was organic because of its Origin,
+so that row also leaves the stored organic series. The fixture does not specify every
+stored Origin-dependent class; the 239 figure is the UA-only expected organic count.
+
+These are fixture counts, not current production counts. The brief's later controller read
+has 1,930 Codex and 1 verify-fix-organic organic rows: **1,931 known organic rows** would move,
+leaving 281 organic rows (271 bare OpenAI MCP + 10 Claude-User). The current total affected
+rows also includes cbeg traffic in other classes and cannot be derived from that aggregate.
+The controller must read back actual affected counts and the C812 rows 7483 and 7520-7524;
+this worker makes no D1 write, historical rollup recompute or Airtable historical rewrite.
