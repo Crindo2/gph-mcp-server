@@ -62,7 +62,7 @@
   {
     "name": "search_providers",
     "title": "Search Provider Directory",
-    "description": "Paginated browse of the healthcare service provider directory filtered by category, location, and minimum profile-completeness score. Returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), contact info, slug}. Use this for open-ended exploration and filtering — for scored recommendations to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.",
+    "description": "Paginated browse of the healthcare service provider directory filtered by category, location, and minimum profile-completeness score. Returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), contact info, slug}. Use this for open-ended exploration and filtering — for scored recommendations to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile. To check whether one named vendor is listed and get its slug, pass `name`.",
     "annotations": {
       "readOnlyHint": true,
       "idempotentHint": true,
@@ -71,6 +71,11 @@
     "inputSchema": {
       "type": "object",
       "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Vendor company name to look up (public company names only; never a practice, person, email, phone number or NPI). Case- and punctuation-insensitive contains/prefix match; returns at most 25 vendors in one page. Combinable with the other filters; category is optional when name is given. The submitted name is never stored."
+        },
         "category": {
           "type": "string",
           "description": "Service category to search (e.g. 'Medical Billing & RCM', 'Credentialing Services')"
@@ -121,9 +126,7 @@
           "default": 1
         }
       },
-      "required": [
-        "category"
-      ]
+      "required": []
     }
   },
   {
