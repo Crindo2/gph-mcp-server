@@ -33,7 +33,7 @@ export async function ehrProductDetail(args) {
   try {
     // Fixed public origin, GET only, no credentials, finite wait including body read.
     const response = await fetch(`https://www.getpracticehelp.com/api/ehr/products/${args.product_key}`, {
-      method: 'GET', credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(10000),
+      method: 'GET', redirect: 'error', signal: AbortSignal.timeout(10000),
     });
     if (!response.ok && response.status !== 404) return frame({ error: 'product_upstream_error' }, true);
     const body = await response.json();

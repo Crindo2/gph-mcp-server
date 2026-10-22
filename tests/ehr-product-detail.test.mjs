@@ -43,11 +43,20 @@ test('HTTP/MCP parity via served path, GET only, no credentials, bounded timeout
   assert.equal(calls[0][0], 'https://www.getpracticehelp.com/api/ehr/products/nextgen-healthcare');
   const options = calls[0][1];
   assert.equal(options.method, 'GET');
-  assert.equal(options.credentials, 'omit');
+  assert.equal(Object.hasOwn(options, 'credentials'), false);
   assert.equal(options.redirect, 'error');
   assert.equal(options.headers, undefined);
   assert.ok(options.signal instanceof AbortSignal);
 });
+test('product fetch init uses only Workers-supported options', async () => {
+  const calls = mock();
+  await invoke({product_key:'nextgen-healthcare'});
+  assert.equal(calls.length, 1);
+  const allowedKeys = new Set(['method', 'headers', 'redirect', 'signal', 'body', 'cf']);
+  const unsupportedKeys = Reflect.ownKeys(calls[0][1]).filter(key => !allowedKeys.has(key));
+  assert.deepEqual(unsupportedKeys, [], 'fetch init must use only Workers-supported options');
+});
+
 test('unknowns, null/absent open bounds and typed values survive unchanged', async () => {
   mock();
   const result = body(await invoke({product_key:'nextgen-healthcare'}));
