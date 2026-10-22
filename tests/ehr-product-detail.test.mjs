@@ -43,11 +43,21 @@ test('HTTP/MCP parity via served path, GET only, no credentials, bounded timeout
   assert.equal(calls[0][0], 'https://www.getpracticehelp.com/api/ehr/products/nextgen-healthcare');
   const options = calls[0][1];
   assert.equal(options.method, 'GET');
-  assert.equal(options.credentials, 'omit');
-  assert.equal(options.redirect, 'error');
+  assert.equal(Object.hasOwn(options, 'credentials'), false);
+  assert.equal(options.redirect, 'manual');
   assert.equal(options.headers, undefined);
   assert.ok(options.signal instanceof AbortSignal);
 });
+test('product fetch init uses only Workers-supported options', async () => {
+  const calls = mock();
+  await invoke({product_key:'nextgen-healthcare'});
+  assert.equal(calls.length, 1);
+  const allowedKeys = new Set(['method', 'headers', 'redirect', 'signal', 'body', 'cf']);
+  const unsupportedKeys = Reflect.ownKeys(calls[0][1]).filter(key => !allowedKeys.has(key));
+  assert.deepEqual(unsupportedKeys, [], 'fetch init must use only Workers-supported options');
+  assert.ok(['follow', 'manual'].includes(calls[0][1].redirect), 'redirect must be follow or manual on Workers');
+});
+
 test('unknowns, null/absent open bounds and typed values survive unchanged', async () => {
   mock();
   const result = body(await invoke({product_key:'nextgen-healthcare'}));
@@ -99,6 +109,21 @@ test('unknown product mirrors projection HTTP 404 JSON', async () => {
   assert.equal(result.isError, true);
   assert.deepEqual(body(result), notFound);
 });
+test('all upstream 3xx responses are rejected without following or reading the body', async () => {
+  const calls = [];
+  for (let status = 300; status < 400; status++) {
+    globalThis.fetch = async (url, options) => {
+      calls.push([url, options]);
+      return new Response(null, {status, headers:{Location:'https://example.invalid/redirect'}});
+    };
+    const result = await invoke({product_key:'nextgen-healthcare'});
+    assert.equal(result.isError, true);
+    assert.deepEqual(body(result), {error:'product_upstream_error'});
+  }
+  assert.equal(calls.length, 100);
+  assert.ok(calls.every(([, options]) => options.redirect === 'manual'));
+});
+
 test('upstream errors, malformed JSON and timeout failures are clean tool errors', async () => {
   mock({error:'private-detail'},503);
   assert.deepEqual(body(await invoke({product_key:'nextgen-healthcare'})), {error:'product_upstream_error'});
