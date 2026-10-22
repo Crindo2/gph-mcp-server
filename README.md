@@ -37,6 +37,17 @@ Get the full profile for a specific vendor including description, services, cont
 **Parameters:**
 - `slug` (required) -- Vendor slug identifier (e.g. "ams-solutions-inc-dallas-tx")
 
+### `get_ehr_product_detail`
+Read the free P1 EHR product projection as JSON, with all publication metadata, facts, explicit editions, plans, conditions and sources unchanged.
+
+**Parameters:**
+- `product_key` (required) -- Exact published product key; aliases are not resolved.
+- `edition_key` -- Exact explicit edition under that product. Validates identity and returns the full product JSON unchanged; no filtering, merging or inheritance.
+
+Invalid or unknown identities return `isError: true` with the projection's `product_not_found` JSON shape. Unknown statuses, absent fields and null/open numeric bounds remain untouched. This tool performs no ranking or calculation. Company tools retain their existing contracts.
+
+**Release obligations (C840 s.2; E8 section 4):** run `node --test tests/*.test.mjs` through the existing PR gate and deploy workflow. The fixture tests cover HTTP/MCP parity, edition identity, invalid IDs, unknown/open bounds and byte-identical existing tool definitions. Controller release must bind independent verification to the final diff, deploy through the existing governed workflow, then read back `tools/list` and a product call logged out against the same published HTTP JSON and publication version. Live parity and deployment remain unverified until that read-back. A P1 schema or identity change requires parity review; no local factual copy is maintained.
+
 ## Usage
 
 ### MCP Endpoint

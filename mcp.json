@@ -10,9 +10,18 @@
       "apiKey": {
         "type": "string",
         "description": "Optional API key for authenticated access",
-        "x-from": { "header": "x-api-key" }
+        "x-from": {
+          "header": "x-api-key"
+        }
       }
     },
     "required": []
-  }
+  },
+  "tools": [
+    "match_practice",
+    "search_providers",
+    "get_provider_detail",
+    "list_categories",
+    "get_ehr_product_detail"
+  ]
 }

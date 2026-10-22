@@ -20,6 +20,8 @@ import {
   NEED_LABEL, EVIDENCE_LABEL, EVIDENCE_SOURCE_LABEL, GEO_BASIS,
 } from './_shared/match-vocab.js';
 
+import { EHR_PRODUCT_TOOL, ehrProductDetail, validateEhrProductArgs } from './_shared/ehr-product-detail.js';
+
 const API_BASE = 'https://www.getpracticehelp.com/api';
 const AT_BASE = 'appvHqDMSu6aCwNxA';
 const AT_LOG_TABLE = 'tbl5ae8t1PbK2AMkx';
@@ -473,6 +475,7 @@ export const TOOLS = [
       required: ['content'],
     },
   },
+  EHR_PRODUCT_TOOL,
 ];
 
 const PROMPTS = [
@@ -548,6 +551,7 @@ function toolError(text) {
 // Exported for tests/arg-validate.test.mjs -- Cloudflare Pages routes only the onRequest*
 // handlers, so additional named exports from a Functions module are inert at runtime.
 export function validateArgs(toolName, args) {
+  if (toolName === EHR_PRODUCT_TOOL.name) return validateEhrProductArgs(args);
   const spec = TOOLS.find(t => t.name === toolName);
   if (!spec) return null; // unknown tool -> callTool's own "Unknown tool" path handles it
   const props = (spec.inputSchema && spec.inputSchema.properties) || {};
@@ -668,6 +672,7 @@ function matchNeedsSummary(summary) {
 }
 
 export async function callTool(name, args) {
+  if (name === EHR_PRODUCT_TOOL.name) return ehrProductDetail(args);
   if (name === 'list_categories') {
     const res = await fetch(`${API_BASE}/categories`);
     const data = await res.json().catch(() => ({}));

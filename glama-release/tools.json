@@ -147,5 +147,35 @@
         "slug"
       ]
     }
+  },
+{
+  "name": "get_ehr_product_detail",
+  "title": "Get EHR Product Detail",
+  "description": "Read the free versioned EHR product JSON projection by exact product key. Returns the complete HTTP JSON body, including explicit edition records, facts, plans, conditions, sources and publication metadata. Optional edition_key validates an explicit identity under this product; the full product response is returned unchanged. No alias resolution, edition inheritance, calculation or ranking. Unknown values and open bounds remain unchanged. Company profiles use get_provider_detail.",
+  "annotations": {
+    "readOnlyHint": true,
+    "idempotentHint": true,
+    "openWorldHint": true,
+    "destructiveHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "product_key": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+$",
+        "description": "Exact P1 product key; aliases are not accepted."
+      },
+      "edition_key": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+$",
+        "description": "Optional exact edition key explicitly recorded under this product. Does not filter or merge facts."
+      }
+    },
+    "required": [
+      "product_key"
+    ],
+    "additionalProperties": false
   }
+}
 ]

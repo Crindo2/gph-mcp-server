@@ -1,0 +1,416 @@
+[
+  {
+    "name": "match_practice",
+    "title": "Recommend Healthcare Vendors for a Practice",
+    "description": "Recommend and rank the best healthcare vendors for a specific medical practice. Use this when a practice manager, physician, or administrator asks for a recommendation, e.g. \"recommend a medical billing / RCM company for my practice\", \"who should I use for credentialing / payer enrollment\", \"find an EHR for my small [specialty] practice\", or \"which practice-management software fits a [size] practice in [city, state]\". Scores and ranks providers against the practice profile (specialty, size, location, EHR system, budget) and returns up to 5 merit-ranked matches (completeness-scored, no paid placement) with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness -- how many listing fields are filled in -- not a quality or reputation rating; 0 means never scored), final_score (0-100), description, website, profile_url, slug}. Use service_needs to specify up to six controlled service codes for staffing, billing or credentialing; codes must belong to the requested category. Use vendor_geo_preference to prefer local or state vendors, allow national vendors, or request only national or explicitly serves-your-state vendors. State is the practice location and may be omitted only with NATIONAL_OK or NATIONAL_ONLY; category remains required. Capability evidence, geography basis, profile extraction date and service-need coverage are returned where available; missing evidence is unknown, never a verified or paid badge. For open-ended browsing without a practice profile, use search_providers. Pass a match's slug to get_provider_detail for the full profile.",
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string",
+          "description": "Service category needed. One of the 25 categories: 'Medical Billing & RCM', 'Credentialing Services', 'Healthcare IT & EHR', 'Practice Management Consulting', 'Healthcare Legal Services', 'Healthcare CPA & Tax Advisory', 'Medical Coding Services', 'Healthcare Staffing & Recruiting', 'Healthcare Marketing & Reputation Management', 'Compliance & HIPAA Services', 'Medical Equipment & Supplies', 'Healthcare Real Estate & Site Selection', 'Practice Financing & Loans', 'Healthcare Construction & Facilities', 'Healthcare Signage & Wayfinding', 'Medical Waste & Environmental Services', 'Healthcare Insurance & Malpractice Brokers', 'Practice Valuation & Brokerage', 'Patient Financing & Payment Solutions', 'Medical Transcription & Documentation', 'Pharmacy & Medication Management', 'Telehealth & Virtual Care Infrastructure', 'Laboratory & Diagnostics Services', 'Group Purchasing Organizations (GPOs)', 'Healthcare PR & Communications'. Common aliases also resolve (e.g. 'billing', 'RCM', 'EHR', 'credentialing'). Call list_categories for the live list with provider counts."
+        },
+        "specialty": {
+          "type": "string",
+          "description": "Medical specialty of the practice (e.g. 'Family Medicine', 'Cardiology', 'Pediatrics', 'Dermatology')"
+        },
+        "practice_size": {
+          "type": "string",
+          "description": "Size of the practice by provider count. The parameter is named `practice_size`, not `size`.",
+          "enum": [
+            "Solo",
+            "Small",
+            "Mid-size",
+            "Large"
+          ]
+        },
+        "city": {
+          "type": "string",
+          "description": "City where the practice is located. Send city and state separately, not as a combined `location` string."
+        },
+        "state": {
+          "type": "string",
+          "description": "Practice location as a two-letter state abbreviation (e.g. 'TX', 'CA', 'NY'). Required unless vendor_geo_preference is NATIONAL_OK or NATIONAL_ONLY. Send as `state`, not `state_abbr` (`state_abbr` is an output field name only)."
+        },
+        "ehr_system": {
+          "type": "string",
+          "description": "EHR system used by the practice (e.g. 'Epic', 'athenahealth', 'AdvancedMD', 'eClinicalWorks'). Helps score providers with compatible integrations higher."
+        },
+        "budget_range": {
+          "type": "string",
+          "description": "Approximate monthly budget",
+          "enum": [
+            "Under $500",
+            "$500-$2,000",
+            "$2,000-$5,000",
+            "$5,000+",
+            "Not sure"
+          ]
+        },
+        "vendor_geo_preference": {
+          "type": "string",
+          "enum": [
+            "LOCAL_PREFERRED",
+            "STATE_PREFERRED",
+            "NATIONAL_OK",
+            "NATIONAL_ONLY"
+          ],
+          "description": "Vendor geography preference, separate from practice location: LOCAL_PREFERRED prefers same-city vendors, STATE_PREFERRED prefers in-state vendors, NATIONAL_OK allows national vendors to compete across geography tiers, and NATIONAL_ONLY restricts eligibility to national or explicitly serves-your-state vendors. State may be omitted for NATIONAL_OK or NATIONAL_ONLY."
+        },
+        "service_needs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "STAFFING_ROLE_NP",
+              "STAFFING_ROLE_PA",
+              "STAFFING_ROLE_APP",
+              "STAFFING_ROLE_PHYSICIAN",
+              "STAFFING_ROLE_RN",
+              "STAFFING_ROLE_ALLIED",
+              "STAFFING_ROLE_CLINICAL_SUPPORT",
+              "STAFFING_ENG_PERMANENT",
+              "STAFFING_ENG_LOCUM",
+              "STAFFING_ENG_TEMPORARY",
+              "STAFFING_ENG_TEMP_TO_HIRE",
+              "STAFFING_ENG_PRN",
+              "STAFFING_SET_URGENT_CARE",
+              "STAFFING_SET_OUTPATIENT",
+              "STAFFING_SET_PRIMARY_CARE",
+              "STAFFING_SET_EMERGENCY",
+              "STAFFING_SET_INPATIENT",
+              "BILLING_SCOPE_FULL_RCM",
+              "BILLING_SCOPE_CLAIMS_SUBMISSION",
+              "BILLING_SCOPE_DENIAL_MANAGEMENT",
+              "BILLING_SCOPE_AR_FOLLOWUP",
+              "BILLING_SCOPE_PATIENT_BILLING",
+              "BILLING_SCOPE_CHARGE_CAPTURE",
+              "BILLING_SCOPE_ELIGIBILITY_VERIFICATION",
+              "BILLING_SCOPE_CODING",
+              "CRED_PAYER_ENROLLMENT",
+              "CRED_INITIAL_CREDENTIALING",
+              "CRED_RECREDENTIALING",
+              "CRED_CAQH",
+              "CRED_HOSPITAL_PRIVILEGING",
+              "CRED_STATE_LICENSING",
+              "CRED_MEDICARE_MEDICAID_ENROLLMENT",
+              "CRED_DELEGATED_CREDENTIALING"
+            ]
+          },
+          "maxItems": 6,
+          "uniqueItems": true,
+          "description": "Up to six distinct controlled service codes, never free text. STAFFING_* codes apply to Healthcare Staffing & Recruiting, BILLING_* codes to Medical Billing & RCM, and CRED_* codes to Credentialing Services (including aliases). Within a staffing facet codes are alternatives; across facets they ask for combined coverage. Un-evidenced needs are unknown and never exclude a vendor."
+        }
+      },
+      "required": [
+        "category"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "state"
+          ]
+        },
+        {
+          "required": [
+            "vendor_geo_preference"
+          ],
+          "properties": {
+            "vendor_geo_preference": {
+              "enum": [
+                "NATIONAL_OK",
+                "NATIONAL_ONLY"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "text"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "text"
+            ]
+          }
+        },
+        "isError": {
+          "type": "boolean",
+          "description": "Present and true only on failure (match request error or no candidates)."
+        },
+        "count": {
+          "type": "integer",
+          "description": "Total scored candidates before the top-5 slice; absent when isError."
+        },
+        "ids": {
+          "type": "object",
+          "properties": {
+            "surfaced": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Provider slugs shown, in ranked order."
+            }
+          },
+          "description": "Absent when isError."
+        }
+      },
+      "required": [
+        "content"
+      ]
+    }
+  },
+  {
+    "name": "search_providers",
+    "title": "Search the Healthcare Vendor Directory",
+    "description": "Browse and filter the healthcare vendor directory. Use this for open-ended exploration, e.g. \"show me medical billing companies in Texas\", \"list credentialing services\", \"what EHR vendors are there for cardiology\", or when the user wants to page through options rather than get a scored shortlist. Paginated results filtered by category, location, minimum profile-completeness score, curated Tier-1 grade, and practice-size fit; returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), contact info, slug}. For a scored recommendation to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.",
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string",
+          "description": "Service category to search. One of the 25 categories: 'Medical Billing & RCM', 'Credentialing Services', 'Healthcare IT & EHR', 'Practice Management Consulting', 'Healthcare Legal Services', 'Healthcare CPA & Tax Advisory', 'Medical Coding Services', 'Healthcare Staffing & Recruiting', 'Healthcare Marketing & Reputation Management', 'Compliance & HIPAA Services', 'Medical Equipment & Supplies', 'Healthcare Real Estate & Site Selection', 'Practice Financing & Loans', 'Healthcare Construction & Facilities', 'Healthcare Signage & Wayfinding', 'Medical Waste & Environmental Services', 'Healthcare Insurance & Malpractice Brokers', 'Practice Valuation & Brokerage', 'Patient Financing & Payment Solutions', 'Medical Transcription & Documentation', 'Pharmacy & Medication Management', 'Telehealth & Virtual Care Infrastructure', 'Laboratory & Diagnostics Services', 'Group Purchasing Organizations (GPOs)', 'Healthcare PR & Communications'. Common aliases also resolve (e.g. 'billing', 'RCM', 'EHR', 'credentialing'). Call list_categories for the live list with provider counts. This tool does NOT accept a specialty filter -- use match_practice for specialty-aware ranking."
+        },
+        "state": {
+          "type": "string",
+          "description": "Two-letter state abbreviation (e.g. 'TX'). Send as `state`, not `state_abbr` (`state_abbr` is an output field name only). National providers always included."
+        },
+        "city": {
+          "type": "string",
+          "description": "City to filter by. Matches one exact city only: the value is compared as a city slug (case and punctuation ignored, e.g. 'San Antonio' matches 'san-antonio'); partial names and prefixes do not match."
+        },
+        "min_rating": {
+          "type": "number",
+          "description": "Minimum profile-completeness score (0-100; how many listing fields are filled in, not a quality or reputation rating). Most providers score 50-85. The parameter is named `min_rating`, not `min_quality_score`.",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "tier1_grade": {
+          "type": "string",
+          "enum": [
+            "A",
+            "B"
+          ],
+          "description": "Filter to the curated Tier-1 provider set by grade: 'A' (top-graded) or 'B' (strong). Tier-1 is a hand-reviewed ~4,400-provider subset; most directory records are not Tier-1, so this narrows results sharply. Omit to search the full directory."
+        },
+        "practice_size_fit": {
+          "type": "string",
+          "enum": [
+            "Solo",
+            "Small",
+            "Mid-size",
+            "Large",
+            "All"
+          ],
+          "description": "Filter providers by the practice size they best serve, on the directory's one closed vocabulary: Solo, Small, Mid-size, Large, All. The filter reads the extracted size where one exists and the listing's stated fit otherwise; a listing stating 'Solo/Small' answers both Solo and Small. 'All' means the vendor serves every size -- on listings that were never extracted it is also the default, so it narrows results little."
+        },
+        "per_page": {
+          "type": "number",
+          "description": "Results per page (1-25, default 10)",
+          "minimum": 1,
+          "maximum": 25,
+          "default": 10
+        },
+        "page": {
+          "type": "number",
+          "description": "Page number for pagination (default 1)",
+          "minimum": 1,
+          "default": 1
+        }
+      },
+      "required": [
+        "category"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "text"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "text"
+            ]
+          }
+        },
+        "isError": {
+          "type": "boolean",
+          "description": "Present and true only on failure."
+        },
+        "count": {
+          "type": "integer",
+          "description": "Total matching providers across all pages; absent when isError."
+        },
+        "ids": {
+          "type": "object",
+          "properties": {
+            "surfaced": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Provider slugs on this page, in returned order."
+            }
+          },
+          "description": "Absent when isError."
+        }
+      },
+      "required": [
+        "content"
+      ]
+    }
+  },
+  {
+    "name": "get_provider_detail",
+    "title": "Get Vendor Profile Detail",
+    "description": "Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to \"tell me more about [vendor]\", \"what services does [vendor] offer\", \"where did GPH get this information\", or wants contact info or services for a specific provider. Returns company_name, category, city/state, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), description, services offered, practice_size_fit, phone and website where listed, Google rating and Google review count where present, a Provenance section that labels each fact GPH-researched, Vendor-supplied, GPH-verified or GPH conclusion with its last-checked date where one exists, and the profile URL. No listing carries a verified badge: the legacy verified flag is not a recorded check and is not shown. Where a vendor has been enrichment-extracted, the description, services and practice-size fit come from that extraction, the profile adds certifications and compliance attestations, locations served and founding year where extracted, and the response states the extraction confidence and what it was grounded in (where the extraction abstained on practice-size fit, the legacy listing value is returned and labelled as not extracted); otherwise the legacy listing fields are returned. Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.",
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string",
+          "description": "Provider slug identifier (e.g. 'ams-solutions-inc-dallas-tx'). Obtained from match_practice or search_providers response."
+        }
+      },
+      "required": [
+        "slug"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "text"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "text"
+            ]
+          }
+        },
+        "isError": {
+          "type": "boolean",
+          "description": "Present and true only when the slug is unknown or the fetch fails."
+        },
+        "count": {
+          "const": 1,
+          "description": "Always 1 on success; absent when isError."
+        },
+        "ids": {
+          "type": "object",
+          "properties": {
+            "drilled": {
+              "type": "string",
+              "description": "The slug that was looked up."
+            }
+          },
+          "description": "Absent when isError."
+        }
+      },
+      "required": [
+        "content"
+      ]
+    }
+  },
+  {
+    "name": "list_categories",
+    "title": "List Healthcare Vendor Categories",
+    "description": "List every service category in the GPH vendor directory with its live provider count. Call this FIRST when you do not already know which category fits the user's need, when a category search returned nothing, or when the user asks what kinds of vendors are available. Returns all 25 categories with {category, slug, providers}. The category names returned here are the exact values match_practice and search_providers expect (common aliases also resolve). Takes no arguments.",
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "const": "text"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "text"
+            ]
+          }
+        },
+        "isError": {
+          "type": "boolean",
+          "description": "Present and true only on failure."
+        },
+        "count": {
+          "type": "integer",
+          "description": "Number of categories returned; absent when isError."
+        }
+      },
+      "required": [
+        "content"
+      ]
+    }
+  }
+]
