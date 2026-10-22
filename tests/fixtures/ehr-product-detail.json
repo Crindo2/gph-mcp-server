@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "publication_version": "synthetic-contract-fixture",
+  "generated_from": {},
+  "product": {
+    "product_key": "nextgen-healthcare",
+    "vendor_key": "nextgen-healthcare",
+    "display_name": "Synthetic fixture",
+    "product_class": "ehr",
+    "aliases": [],
+    "vendor": {},
+    "editions": [
+      {
+        "product_key": "nextgen-healthcare",
+        "edition_key": "office",
+        "subject": "edition:nextgen-healthcare/office",
+        "facts": [
+          {
+            "status": "unknown"
+          }
+        ]
+      },
+      {
+        "product_key": "nextgen-healthcare",
+        "edition_key": "enterprise",
+        "facts": []
+      }
+    ],
+    "edition_coverage": "partial",
+    "facts": [
+      {
+        "status": "known",
+        "value_num_min": 800,
+        "value_num_max": null,
+        "currency": "USD",
+        "unit": "month"
+      },
+      {
+        "status": "known",
+        "value_num_min": 0
+      },
+      {
+        "status": "unknown"
+      },
+      {
+        "status": "vendor_does_not_publish",
+        "value_json": {
+          "included": false
+        }
+      }
+    ],
+    "plans": [
+      {
+        "eligible": null,
+        "basis": [],
+        "components": []
+      }
+    ],
+    "conditions": [],
+    "excluded_base_slots": [],
+    "sources": []
+  }
+}
