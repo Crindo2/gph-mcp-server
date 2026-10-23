@@ -1,3 +1,5 @@
+import { publicToolData } from './monetization-boundary.js';
+
 // C840 s.2 / E8 section 4: read the P1 projection, without a second factual store.
 export const EHR_PRODUCT_TOOL = {
   name: 'get_ehr_product_detail',
@@ -37,7 +39,7 @@ export async function ehrProductDetail(args) {
     });
     if (response.status >= 300 && response.status < 400) return frame({ error: 'product_upstream_error' }, true);
     if (!response.ok && response.status !== 404) return frame({ error: 'product_upstream_error' }, true);
-    const body = await response.json();
+    const body = publicToolData(await response.json());
     if (response.status === 404) return frame(body, true);
     if (args.edition_key !== undefined && !body.product?.editions?.some(e =>
       e.product_key === args.product_key && e.edition_key === args.edition_key)) return notFound();

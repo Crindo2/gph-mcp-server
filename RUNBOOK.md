@@ -143,3 +143,61 @@ leaving 281 organic rows (271 bare OpenAI MCP + 10 Claude-User). The current tot
 rows also includes cbeg traffic in other classes and cannot be derived from that aggregate.
 The controller must read back actual affected counts and the C812 rows 7483 and 7520-7524;
 this worker makes no D1 write, historical rollup recompute or Airtable historical rewrite.
+
+
+## Row 16 MCP monetization boundary (staging only)
+
+C785 s.1/s.3, C787 s.3 and C1082 row 16: this build is uncommitted and
+requires independent verification before controller promotion. No deploy or
+migration is performed. The default configuration emits no Quotes link.
+
+To exercise a separately built S3 staging form, set BOTH:
+- `MCP_GET_QUOTES_ENABLED=1` (only this literal string enables links).
+- `MCP_GET_QUOTES_URL=https://<staging-project>.pages.dev/<form-path>/`.
+
+The URL must be HTTPS on a pages.dev subdomain with no credentials, port,
+query or fragment. There is deliberately no presumed production destination.
+S3 must provide the actual form route; this MCP build does not create it.
+`match_practice` appends `vendor=<slug>&source=mcp`. Opening the link is only
+navigation; S3 owns vendor selection, named consent, POST confirmation,
+withdrawal and dispatch-time eligibility checks. MCP attribution stays
+separate from browser experiment assignment.
+
+Upstream integration contract (new, fail closed until S3 provides it): a match
+row needs `quotes_contact_deliverable: true` and `quotes_contact_source` equal
+to `claimed_profile` or `verified_sales`. These are server-derived public
+eligibility assertions, never arguments from the tool caller. A claimed or
+verified directory badge alone is insufficient. S3 must revoke the assertion
+when the contact becomes undeliverable/stale. No email/contact value is put in
+the link or tool response. Missing eligibility, configuration or a safe slug
+suppresses only the Quotes line; existing website/profile links remain.
+
+Sponsored ENTRY markers accepted by the MCP boundary are `sponsored` or
+`is_sponsored` equal to true, 1 or '1', or `entry_type`/`placement_type` equal
+to 'sponsored'. Upstream must mark placement rows with this contract. Rows
+are filtered before match top-five selection, numbering and telemetry IDs;
+search cache hits use the same filter. A sponsored-only detail record is
+returned as not found. Separate sponsored arrays are never rendered. Vendor
+membership/payment fields do not suppress an independently organic record.
+When a mixed page is filtered, its reported count is only the visible organic
+cohort, because the upstream total cannot establish a full organic total.
+Upstream geography and service-need summaries are suppressed for a mixed
+shortlist because their computation may include paid entries. Without sponsored
+entries, upstream counts and response bytes stay unchanged.
+
+Structured private inquiry containers and known inquiry fields are removed
+at the upstream JSON boundary, including the EHR projection that otherwise
+returns raw JSON. Public profile rendering continues to use its existing
+field selection. This is not an inquiry service or a substitute for keeping
+private records out of the public API. No person-level inquiry store is read.
+C812's existing internal classifier is retained: estate Codex, cbeg harness
+and the known test string remain `internal`, excluded from the rollup's
+`organic_assistant` population. Historical row backfill and external rollups
+are outside this offline build.
+
+Validation: `node --test tests/*.test.mjs`. The row16-baseline fixture contains
+six complete responses captured from the unmodified 15db34e worktree before
+this change (including nonempty/empty match and found/missing detail). The
+new suite compares serialized responses through callTool and serveTool for
+absent, empty and disabled configurations; it also covers enabled eligibility,
+unsafe URLs, sponsored markers/cache hits, privacy and internal telemetry.

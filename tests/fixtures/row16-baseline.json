@@ -1,0 +1,125 @@
+[
+  {
+    "name": "match_practice",
+    "args": {
+      "category": "Healthcare CPA & Tax Advisory",
+      "state": "TX"
+    },
+    "data": {
+      "success": true,
+      "total": 12,
+      "matches": [
+        {
+          "slug": "fixture-organic",
+          "company_name": "Fixture Organic",
+          "category": "Healthcare CPA & Tax Advisory",
+          "city": "Austin",
+          "state_abbr": "TX",
+          "quality_score": 75,
+          "final_score": 83,
+          "description": "Public description",
+          "website": "https://vendor.invalid",
+          "services_tags": "Accounting,Tax",
+          "practice_size_fit": "Small",
+          "quotes_contact_deliverable": true,
+          "quotes_contact_source": "verified_sales"
+        }
+      ],
+      "geo_honesty_note": "Fixture geography"
+    },
+    "expected": "{\"content\":[{\"type\":\"text\",\"text\":\"_Fixture geography_\\n\\nFound 12 providers. Top 1 matches:\\n\\n1. **Fixture Organic**\\n   Category: Healthcare CPA & Tax Advisory\\n   Location: Austin, TX\\n   Profile Completeness: 75/100\\n   Match Score: 83/100\\n   Public description...\\n   Website: https://vendor.invalid\\n   Profile: https://www.getpracticehelp.com/providers/fixture-organic/\"}],\"count\":12,\"ids\":{\"surfaced\":[\"fixture-organic\"]}}"
+  },
+  {
+    "name": "match_practice",
+    "args": {
+      "category": "Healthcare CPA & Tax Advisory",
+      "state": "TX"
+    },
+    "data": {
+      "success": true,
+      "total": 0,
+      "matches": []
+    },
+    "expected": "{\"content\":[{\"type\":\"text\",\"text\":\"Found 0 providers. Top 0 matches:\\n\\nNo matching providers found for your criteria. Try broadening your search (e.g. remove city filter or change category).\"}],\"count\":0,\"ids\":{\"surfaced\":[]}}"
+  },
+  {
+    "name": "get_provider_detail",
+    "args": {
+      "slug": "fixture-organic"
+    },
+    "data": {
+      "success": true,
+      "provider": {
+        "slug": "fixture-organic",
+        "company_name": "Fixture Organic",
+        "category": "Healthcare CPA & Tax Advisory",
+        "city": "Austin",
+        "state_abbr": "TX",
+        "quality_score": 75,
+        "final_score": 83,
+        "description": "Public description",
+        "website": "https://vendor.invalid",
+        "services_tags": "Accounting,Tax",
+        "practice_size_fit": "Small",
+        "quotes_contact_deliverable": true,
+        "quotes_contact_source": "verified_sales"
+      }
+    },
+    "expected": "{\"content\":[{\"type\":\"text\",\"text\":\"# Fixture Organic\\n**Category:** Healthcare CPA & Tax Advisory\\n**Location:** Austin, TX\\n**Profile Completeness:** 75/100\\n## About\\nPublic description\\n## Services\\nAccounting, Tax\\n**Practice Size Fit:** Small\\n**Website:** https://vendor.invalid\\n**Profile:** https://www.getpracticehelp.com/providers/fixture-organic/\"}],\"count\":1,\"ids\":{\"drilled\":\"fixture-organic\"}}"
+  },
+  {
+    "name": "get_provider_detail",
+    "args": {
+      "slug": "absent"
+    },
+    "data": {
+      "success": false
+    },
+    "expected": "{\"content\":[{\"type\":\"text\",\"text\":\"Provider not found: absent\"}],\"isError\":true,\"count\":0}"
+  },
+  {
+    "name": "search_providers",
+    "args": {
+      "category": "Healthcare CPA & Tax Advisory"
+    },
+    "data": {
+      "success": true,
+      "pagination": {
+        "total": 12
+      },
+      "providers": [
+        {
+          "slug": "fixture-organic",
+          "company_name": "Fixture Organic",
+          "category": "Healthcare CPA & Tax Advisory",
+          "city": "Austin",
+          "state_abbr": "TX",
+          "quality_score": 75,
+          "final_score": 83,
+          "description": "Public description",
+          "website": "https://vendor.invalid",
+          "services_tags": "Accounting,Tax",
+          "practice_size_fit": "Small",
+          "quotes_contact_deliverable": true,
+          "quotes_contact_source": "verified_sales"
+        }
+      ]
+    },
+    "expected": "{\"content\":[{\"type\":\"text\",\"text\":\"12 total results (page 1):\\n\\n1. **Fixture Organic**, Austin, TX\\n   Profile Completeness: 75/100\\n   Category: Healthcare CPA & Tax Advisory\\n   Website: https://vendor.invalid\"}],\"count\":12,\"ids\":{\"surfaced\":[\"fixture-organic\"]}}"
+  },
+  {
+    "name": "list_categories",
+    "args": {},
+    "data": {
+      "success": true,
+      "total_providers": 12,
+      "categories": [
+        {
+          "category": "Healthcare CPA & Tax Advisory",
+          "providers": 12
+        }
+      ]
+    },
+    "expected": "{\"content\":[{\"type\":\"text\",\"text\":\"1 service categories, 12 providers total:\\n\\n- **Healthcare CPA & Tax Advisory** -- 12 providers\\n\\nPass a category name to search_providers or match_practice exactly as written above.\"}],\"count\":1}"
+  }
+]

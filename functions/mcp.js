@@ -22,6 +22,8 @@ import {
 
 import { EHR_PRODUCT_TOOL, ehrProductDetail, validateEhrProductArgs } from './_shared/ehr-product-detail.js';
 
+import { isSponsoredEntry, quotesLink, publicToolData } from './_shared/monetization-boundary.js';
+
 const API_BASE = 'https://www.getpracticehelp.com/api';
 const AT_BASE = 'appvHqDMSu6aCwNxA';
 const AT_LOG_TABLE = 'tbl5ae8t1PbK2AMkx';
@@ -671,11 +673,11 @@ function matchNeedsSummary(summary) {
   return `Service-need coverage across the API shortlist (up to 10 providers): ${summary.evidenced_any}/${summary.requested} requested codes evidenced; ${summary.unknown} unknown. Missing evidence is unknown, not proof that a service is unavailable.\n\n`;
 }
 
-export async function callTool(name, args) {
+export async function callTool(name, args, { env = null } = {}) {
   if (name === EHR_PRODUCT_TOOL.name) return ehrProductDetail(args);
   if (name === 'list_categories') {
     const res = await fetch(`${API_BASE}/categories`);
-    const data = await res.json().catch(() => ({}));
+    const data = publicToolData(await res.json().catch(() => ({})));
     if (!res.ok || !data.success) return toolError(`Could not load categories: ${data.error || res.status}`);
     const cats = data.categories || [];
     const text = [
@@ -694,10 +696,15 @@ export async function callTool(name, args) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(args),
     });
-    const data = await res.json();
+    const data = publicToolData(await res.json());
     if (!data.success) return { content: [{ type: 'text', text: `Match failed: ${data.error || 'Unknown error'}` }], isError: true };
 
-    const matches = (data.matches || []).slice(0, 5);
+    const organic = (data.matches || []).filter(m => !isSponsoredEntry(m));
+    const excluded = organic.length !== (data.matches || []).length;
+    const matches = organic.slice(0, 5);
+    // An upstream mixed total is not an organic count. Only claim the visible
+    // organic cohort when exclusion was necessary; unchanged on today's API.
+    const total = excluded ? organic.length : data.total;
     const text = matches.length === 0
       ? 'No matching providers found for your criteria. Try broadening your search (e.g. remove city filter or change category).'
       : matches.map((m, i) => [
@@ -709,6 +716,7 @@ export async function callTool(name, args) {
           ...matchEvidenceLines(m),
           m.description ? `   ${m.description.substring(0, 150)}...` : '',
           m.website ? `   Website: ${m.website}` : '',
+          quotesLink(m, env),
           `   Profile: https://www.getpracticehelp.com/providers/${m.slug}/`,
         ].filter(Boolean).join('\n')).join('\n\n');
     // Honest-N tiered ranking (Stage 2.2/2.6, 2026-07-09 directive): surface geo_honesty_note --
@@ -716,9 +724,9 @@ export async function callTool(name, args) {
     // just on the web widget, since this text IS the caller-facing surface for MCP clients.
     // Generic passthrough -- the Stage 2.6 regional-only case needs no change here, only in the
     // per-row label line above and in match.js's own geoHonestyNote computation.
-    const honestyPrefix = data.geo_honesty_note ? `_${data.geo_honesty_note}_\n\n` : '';
+    const honestyPrefix = !excluded && data.geo_honesty_note ? `_${data.geo_honesty_note}_\n\n` : '';
 
-    return { content: [{ type: 'text', text: `${honestyPrefix}${matchNeedsSummary(data.needs_summary)}Found ${data.total || matches.length} providers. Top ${matches.length} matches:\n\n${text}` }], count: data.total ?? matches.length, ids: { surfaced: matches.map(m => m.slug).filter(Boolean) } };
+    return { content: [{ type: 'text', text: `${honestyPrefix}${matchNeedsSummary(excluded ? null : data.needs_summary)}Found ${total || matches.length} providers. Top ${matches.length} matches:\n\n${text}` }], count: total ?? matches.length, ids: { surfaced: matches.map(m => m.slug).filter(Boolean) } };
   }
 
   if (name === 'search_providers') {
@@ -735,8 +743,8 @@ export async function callTool(name, args) {
     // count: 0 so telemetry records the miss as zero_result (D850: drill misses were invisible).
     if (!res.ok) return { content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true, count: 0 };
 
-    const data = await res.json();
-    if (!data.success || !data.provider) return { content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true, count: 0 };
+    const data = publicToolData(await res.json());
+    if (!data.success || !data.provider || isSponsoredEntry(data.provider)) return { content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true, count: 0 };
     const p = data.provider;
     // P2-WIRE: enriched_* first, legacy columns as fallback only.
     const e = resolveEnrichedProfile(p);
@@ -917,7 +925,7 @@ export async function fetchSearchData(args = {}, { cache = null, now = Date.now(
         const cachedAt = Number(cached.headers.get('x-gph-cached-at'));
         const ageMs = now - cachedAt;
         if (cached.headers.get('x-gph-cached-at') && Number.isFinite(cachedAt) && ageMs >= 0 && ageMs < SEARCH_CACHE_TTL_SECONDS * 1000) {
-          const data = await cached.json();
+          const data = publicToolData(await cached.json());
           if (data && data.success === true) return { data, cacheStatus: 'hit' };
         }
       }
@@ -929,7 +937,7 @@ export async function fetchSearchData(args = {}, { cache = null, now = Date.now(
   }
 
   const res = await fetch(`${API_BASE}/search?${searchUpstreamParams(args)}`);
-  const data = await res.json();
+  const data = publicToolData(await res.json());
 
   if (keyRequest && data && data.success === true) {
     const stored = new Response(JSON.stringify(data), {
@@ -950,7 +958,8 @@ export async function fetchSearchData(args = {}, { cache = null, now = Date.now(
 export function renderSearchResult(args, data) {
   if (!data.success) return { content: [{ type: 'text', text: `Search failed: ${data.error || 'Unknown error'}` }], isError: true };
 
-  const providers = data.providers || [];
+  const providers = (data.providers || []).filter(p => !isSponsoredEntry(p));
+  const excluded = providers.length !== (data.providers || []).length;
   const text = providers.length === 0
     ? 'No providers found matching your criteria.'
     : providers.map((p, i) => [
@@ -961,7 +970,7 @@ export function renderSearchResult(args, data) {
         p.website ? `   Website: ${p.website}` : '',
       ].filter(Boolean).join('\n')).join('\n\n');
 
-  const totalResults = data.pagination?.total ?? data.total ?? providers.length;
+  const totalResults = excluded ? providers.length : (data.pagination?.total ?? data.total ?? providers.length);
   return { content: [{ type: 'text', text: `${totalResults} total results (page ${args.page || 1}):\n\n${text}` }], count: totalResults, ids: { surfaced: providers.map(p => p.slug).filter(Boolean) } };
 }
 
@@ -984,7 +993,7 @@ export async function serveTool(name, args, { env = null, now = Date.now(), wait
     const { data, cacheStatus } = await fetchSearchData(args, { cache, now, waitUntil });
     return { result: renderSearchResult(args, data), cacheStatus };
   }
-  return { result: await callTool(name, args), cacheStatus: null };
+  return { result: await callTool(name, args, { env }), cacheStatus: null };
 }
 
 // ── Prompt execution ──
