@@ -1,19 +1,18 @@
 {
  "program_id": "GPH-PRACTICE-DATA-01",
- "stage_id": "C1471-MCP-PRACTICE-DATA-COUNTS",
- "allocation_id": "ALLOC-REFILL-GPH-PRACTICE-DATA-01-C1471-MCP-PRACTICE-DATA-COUNTS-92c9b668",
- "worker_id": "WKR-REFILL-GPH-PRACTICE-DATA-01-C1471-MCP-PRACTICE-DATA-COUNTS-6e87cd98",
+ "stage_id": "C1471-MCP-PRACTICE-DATA-COUNTS-REPAIR-1",
+ "allocation_id": "ALLOC-REFILL-GPH-PRACTICE-DATA-01-C1471-MCP-PRACTICE-DATA-COUNTS-REPAIR-1-e93b1f15",
+ "worker_id": "WKR-REFILL-GPH-PRACTICE-DATA-01-C1471-MCP-PRACTICE-DATA-COUNTS-REPAIR-1-d570d85c",
  "result": "NEEDS_VERIFY",
  "model_used": "claude-sonnet-5-5",
- "head": "7fe025ce8ceb325330ba1dd7ce944d6f85af1b48",
- "outcome": "practice_data_counts sixth MCP tool added with tests, listings and README; branch cloud/c1471-mcp-practice-data-counts-b",
- "summary": "Added practice_data_counts (functions/_shared/practice-data-counts.js), wired into TOOLS, validateArgs and callTool in mcp.js. GET to the counts endpoint with optional state and segment, redirect manual, 10s timeout, non-200 and failures map to tool errors. New tests/practice-data-counts.test.mjs (7 tests, fetch stubbed). Byte-lock test and serving-m1 tool count (5 to 6) updated. Full suite node --test tests/*.test.mjs: 154 tests, 154 pass, 0 fail. Mutants: dropping the state pattern fails 1 test; filling a suppressed cell with 0 fails 2 tests; both reverted. glama-release/tools.json, mcp.json and README updated; server.json lists no tools so unchanged. No live network used.",
- "boundary": "Only the files named in the brief changed; no main push, deploy, PR, secret or production write. The other five tools are unchanged.",
+ "head": "e8025f83374321d457b78f7836818f6142923742",
+ "outcome": "practice_data_counts segment is now an enum of the six endpoint slugs validated before any fetch; glama-release/tools.json lists all six served tools",
+ "summary": "Segment enum (primary-care, dental, pt-ot-speech, specialty-clinics, behavioral-health, derm-peds-vision-podiatry) in functions/_shared/practice-data-counts.js, shared by the TOOLS input schema and argument validation; unknown slug returns a tool error with no fetch. Added list_categories to glama-release/tools.json with name, title, description, annotations and inputSchema taken from the TOOLS entry; practice_data_counts schema there updated to the enum. New tests: enum equals the six slugs in order, unknown segments error with zero fetch calls, each of the six passes and is fetched, mcp.json / glama tools.json / TOOLS name the same six tools. Full suite node --test tests/*.test.mjs: 158 tests, 158 pass, 0 fail. Mutant: dropping the dental slug from the enum gave 156 pass, 2 fail; reverted, suite back to 158 of 158. No network used.",
+ "boundary": "Only the files named in the brief changed; no main push, deploy, PR, secret or production write.",
  "blocker": "",
  "material_exception": false,
  "findings": [
-  "The segment enum could not be filled: no network access beyond git and the repo contains only one segment slug (primary-care). The brief forbids inventing slugs, so segment is constrained by pattern ^[a-z0-9-]+$ instead of an enum of 6. Verifier or controller should replace it with the 6 served slugs from the live response or Worker source.",
-  "Live endpoint parity not checked from this session; verify against the deployed endpoint."
+  "Live endpoint parity not checked from this session; the six slugs are taken from the brief."
  ],
  "changed_paths": [
   "README.md",
@@ -33,7 +32,7 @@
   },
   {
    "path": "functions/_shared/practice-data-counts.js",
-   "sha256": "be1f4b92ef7c3048522c2b75770787d973c67660f8b090e2809d87bb9875174e"
+   "sha256": "551999274658eceb9369e6e6d5af849c9be464662781964e39271aa9560c1566"
   },
   {
    "path": "functions/mcp.js",
@@ -41,7 +40,7 @@
   },
   {
    "path": "glama-release/tools.json",
-   "sha256": "bae011d824b16d51428fd4a5ee611ee12481d2e53dfdbe429c6b67a05ebd92dc"
+   "sha256": "a6a04894b5d486b5154514f13a1b05768f7992fcf150f6a296dd669aad3a4591"
   },
   {
    "path": "mcp.json",
@@ -53,7 +52,7 @@
   },
   {
    "path": "tests/practice-data-counts.test.mjs",
-   "sha256": "bce010bf3bfc49ca2b422183daf16e58a250b942d19ac4fd981d08eaa0f76f4e"
+   "sha256": "0fee20034268eaafec2d1e96096afc97b1ed9a9f82ab4cc87801058d3fe2330b"
   },
   {
    "path": "tests/serving-m1.test.mjs",
