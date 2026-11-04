@@ -29,9 +29,9 @@ test('product tool is additive in discovery and catalogs', async () => {
 test('all existing definitions remain byte-identical and runtime-identical', () => {
   const s = readFileSync(new URL('../functions/mcp.js', import.meta.url), 'utf8');
   const start = s.indexOf('export const TOOLS = [');
-  const block = s.slice(start, s.indexOf('\nconst PROMPTS', start)).replace('\n  EHR_PRODUCT_TOOL,', '');
+  const block = s.slice(start, s.indexOf('\nconst PROMPTS', start)).replace('\n  EHR_PRODUCT_TOOL,', '').replace('\n  PRACTICE_DATA_COUNTS_TOOL,', '');
   assert.equal(block, read('ehr-existing-tools-source.txt'));
-  assert.deepEqual(TOOLS.filter(t => t.name !== 'get_ehr_product_detail'), JSON.parse(read('ehr-existing-tools.json')));
+  assert.deepEqual(TOOLS.filter(t => t.name !== 'get_ehr_product_detail' && t.name !== 'practice_data_counts'), JSON.parse(read('ehr-existing-tools.json')));
 });
 test('HTTP/MCP parity via served path, GET only, no credentials, bounded timeout', async () => {
   const calls = mock();

@@ -1,0 +1,82 @@
+import { test, afterEach } from 'node:test';
+import assert from 'node:assert/strict';
+import { TOOLS, callTool, validateArgs, handleMcpRequest } from '../functions/mcp.js';
+const originalFetch = globalThis.fetch;
+afterEach(() => { globalThis.fetch = originalFetch; });
+const URL0 = 'https://www.getpracticehelp.com/data/api/counts';
+const invoke = args => callTool('practice_data_counts', args);
+const body = r => JSON.parse(r.content[0].text);
+// Synthetic shape fixture, not a production observation.
+const fixture = { schema_version: 1, as_of: '2026-11-04', unit: 'practices (headline evidence)', min_cell: 25,
+  states: [{ state: 'TX', segments: [
+    { segment_code: '01_PRIMARY_CARE_AND_PHYSICIAN', segment_slug: 'primary-care', label: 'Primary care', count: 120, suppressed: false },
+    { segment_code: 'X', segment_slug: 'other', label: 'Other', count: null, suppressed: true }] }] };
+function mock(data = fixture, status = 200) {
+  const calls = [];
+  globalThis.fetch = async (...a) => { calls.push(a); return Response.json(data, { status }); };
+  return calls;
+}
+test('tools/list shows 6 tools including practice_data_counts', async () => {
+  const listed = await handleMcpRequest({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+  assert.equal(listed.result.tools.length, 6);
+  const spec = listed.result.tools.find(t => t.name === 'practice_data_counts');
+  assert.ok(spec);
+  assert.equal(spec.inputSchema.additionalProperties, false);
+  assert.equal(spec.inputSchema.properties.state.pattern, '^[A-Z]{2}$');
+  assert.equal(TOOLS.length, 6);
+});
+test('no arguments: bare URL, GET, manual redirect, no credentials, timeout', async () => {
+  const calls = mock();
+  const r = await invoke({});
+  assert.deepEqual(body(r), fixture);
+  assert.equal(r.isError, undefined);
+  assert.equal(calls[0][0], URL0);
+  const o = calls[0][1];
+  assert.equal(o.method, 'GET'); assert.equal(o.redirect, 'manual');
+  assert.equal(Object.hasOwn(o, 'credentials'), false); assert.equal(o.headers, undefined);
+  assert.ok(o.signal instanceof AbortSignal);
+});
+test('filters build the query', async () => {
+  const calls = mock();
+  await invoke({ state: 'TX', segment: 'primary-care' });
+  await invoke({ state: 'CA' });
+  await invoke({ segment: 'primary-care' });
+  assert.deepEqual(calls.map(c => c[0]), [`${URL0}?state=TX&segment=primary-care`, `${URL0}?state=CA`, `${URL0}?segment=primary-care`]);
+});
+test('invalid arguments never fetch', async () => {
+  const calls = mock();
+  for (const args of [{ state: 'tx' }, { state: 'TEX' }, { state: 'T' }, { state: 1 }, { state: null }, { state: 'T1' },
+    { segment: 'Primary Care' }, { segment: 1 }, { segment: '' }, { segment: 'a/b' }, { guess: true }, [], 'x']) {
+    assert.equal(validateArgs('practice_data_counts', args).isError, true, JSON.stringify(args));
+    const r = await invoke(args);
+    assert.equal(r.isError, true);
+    assert.deepEqual(body(r), { error: 'invalid_arguments' });
+  }
+  assert.equal(calls.length, 0);
+  assert.equal(validateArgs('practice_data_counts', {}), null);
+  assert.equal(validateArgs('practice_data_counts', { state: 'TX', segment: 'primary-care' }), null);
+});
+test('upstream 400, 500 and other non-200 map to tool errors, no count', async () => {
+  for (const status of [400, 405, 500, 503, 301, 204]) {
+    globalThis.fetch = async () => new Response(status === 301 || status === 204 ? null : JSON.stringify({ count: 999 }), { status });
+    const r = await invoke({ state: 'TX' });
+    assert.equal(r.isError, true, String(status));
+    assert.deepEqual(body(r), { error: 'practice_data_counts_upstream_error', status });
+  }
+});
+test('timeout, network failure and malformed JSON map to tool errors', async () => {
+  globalThis.fetch = async () => { throw new DOMException('timeout', 'TimeoutError'); };
+  let r = await invoke({});
+  assert.equal(r.isError, true);
+  assert.deepEqual(body(r), { error: 'practice_data_counts_upstream_unavailable' });
+  globalThis.fetch = async () => { throw new TypeError('network'); };
+  assert.equal((await invoke({})).isError, true);
+  globalThis.fetch = async () => new Response('not JSON');
+  assert.equal((await invoke({})).isError, true);
+});
+test('suppressed cell passes through as null, never 0', async () => {
+  mock();
+  const cell = body(await invoke({ state: 'TX' })).states[0].segments[1];
+  assert.strictEqual(cell.count, null);
+  assert.strictEqual(cell.suppressed, true);
+});

@@ -48,6 +48,15 @@ Invalid or unknown identities return `isError: true` with the projection's `prod
 
 **Release obligations (C840 s.2; E8 section 4):** run `node --test tests/*.test.mjs` through the existing PR gate and deploy workflow. The fixture tests cover HTTP/MCP parity, edition identity, invalid IDs, unknown/open bounds and byte-identical existing tool definitions. Controller release must bind independent verification to the final diff, deploy through the existing governed workflow, then read back `tools/list` and a product call logged out against the same published HTTP JSON and publication version. Live parity and deployment remain unverified until that read-back. A P1 schema or identity change requires parity review; no local factual copy is maintained.
 
+### `practice_data_counts`
+Headline practice counts by US state and practice segment, read from the public endpoint `https://www.getpracticehelp.com/data/api/counts`. Aggregate counts only, no records. Cells under 25 are not published and come back as `count: null, suppressed: true`.
+
+**Parameters:**
+- `state` -- optional two-letter capital state code (e.g. "TX").
+- `segment` -- optional segment slug as served by the endpoint (e.g. "primary-care").
+
+Upstream errors and non-200 responses return `isError: true`; no count is ever invented.
+
 ## Usage
 
 ### MCP Endpoint

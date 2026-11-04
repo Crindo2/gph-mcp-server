@@ -177,5 +177,32 @@
     ],
     "additionalProperties": false
   }
-}
+},
+  {
+    "name": "practice_data_counts",
+    "title": "Practice Data Counts",
+    "description": "Headline practice counts by US state and practice segment, from the public Practice Data aggregate endpoint. Aggregate counts only: no records are exposed, and cells with fewer than 25 practices are not published (returned with count null and suppressed true). Optional state and segment filters narrow the result; the JSON body is returned unchanged.",
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$",
+          "description": "Optional two-letter capital US state code, e.g. TX."
+        },
+        "segment": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Optional segment slug as served by the endpoint, e.g. primary-care."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
 ]
