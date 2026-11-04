@@ -1,3 +1,4 @@
+export const PRACTICE_DATA_SEGMENTS = Object.freeze(['primary-care', 'dental', 'pt-ot-speech', 'specialty-clinics', 'behavioral-health', 'derm-peds-vision-podiatry']);
 // C1471 s.4.2: aggregate practice counts by US state and segment. Reads the public JSON endpoint only.
 export const PRACTICE_DATA_COUNTS_TOOL = {
   name: 'practice_data_counts',
@@ -8,7 +9,7 @@ export const PRACTICE_DATA_COUNTS_TOOL = {
     type: 'object',
     properties: {
       state: { type: 'string', pattern: '^[A-Z]{2}$', description: 'Optional two-letter capital US state code, e.g. TX.' },
-      segment: { type: 'string', pattern: '^[a-z0-9-]+$', description: 'Optional segment slug as served by the endpoint, e.g. primary-care.' },
+      segment: { type: 'string', enum: [...PRACTICE_DATA_SEGMENTS], description: 'Optional practice segment slug, one of the six served by the endpoint, e.g. primary-care.' },
     },
     additionalProperties: false,
   },
@@ -20,7 +21,7 @@ export function validatePracticeDataCountsArgs(args) {
   if (typeof a !== 'object' || Array.isArray(a) ||
       Object.keys(a).some(k => !['state', 'segment'].includes(k)) ||
       (Object.hasOwn(a, 'state') && (typeof a.state !== 'string' || !/^[A-Z]{2}$/.test(a.state))) ||
-      (Object.hasOwn(a, 'segment') && (typeof a.segment !== 'string' || !/^[a-z0-9-]+$/.test(a.segment)))) {
+      (Object.hasOwn(a, 'segment') && (typeof a.segment !== 'string' || !PRACTICE_DATA_SEGMENTS.includes(a.segment)))) {
     return frame({ error: 'invalid_arguments' }, true);
   }
   return null;

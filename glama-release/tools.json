@@ -148,36 +148,52 @@
       ]
     }
   },
-{
-  "name": "get_ehr_product_detail",
-  "title": "Get EHR Product Detail",
-  "description": "Read the free versioned EHR product JSON projection by exact product key. Returns the complete HTTP JSON body, including explicit edition records, facts, plans, conditions, sources and publication metadata. Optional edition_key validates an explicit identity under this product; the full product response is returned unchanged. No alias resolution, edition inheritance, calculation or ranking. Unknown values and open bounds remain unchanged. Company profiles use get_provider_detail.",
-  "annotations": {
-    "readOnlyHint": true,
-    "idempotentHint": true,
-    "openWorldHint": true,
-    "destructiveHint": false
-  },
-  "inputSchema": {
-    "type": "object",
-    "properties": {
-      "product_key": {
-        "type": "string",
-        "pattern": "^[a-z0-9-]+$",
-        "description": "Exact P1 product key; aliases are not accepted."
-      },
-      "edition_key": {
-        "type": "string",
-        "pattern": "^[a-z0-9-]+$",
-        "description": "Optional exact edition key explicitly recorded under this product. Does not filter or merge facts."
-      }
+  {
+    "name": "list_categories",
+    "title": "List Healthcare Vendor Categories",
+    "description": "List every service category in the GPH vendor directory with its live provider count. Call this FIRST when you do not already know which category fits the user's need, when a category search returned nothing, or when the user asks what kinds of vendors are available. Returns all 25 categories with {category, slug, providers}. The category names returned here are the exact values match_practice and search_providers expect (common aliases also resolve). Takes no arguments.",
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "destructiveHint": false
     },
-    "required": [
-      "product_key"
-    ],
-    "additionalProperties": false
-  }
-},
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "get_ehr_product_detail",
+    "title": "Get EHR Product Detail",
+    "description": "Read the free versioned EHR product JSON projection by exact product key. Returns the complete HTTP JSON body, including explicit edition records, facts, plans, conditions, sources and publication metadata. Optional edition_key validates an explicit identity under this product; the full product response is returned unchanged. No alias resolution, edition inheritance, calculation or ranking. Unknown values and open bounds remain unchanged. Company profiles use get_provider_detail.",
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "destructiveHint": false
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "product_key": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Exact P1 product key; aliases are not accepted."
+        },
+        "edition_key": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$",
+          "description": "Optional exact edition key explicitly recorded under this product. Does not filter or merge facts."
+        }
+      },
+      "required": [
+        "product_key"
+      ],
+      "additionalProperties": false
+    }
+  },
   {
     "name": "practice_data_counts",
     "title": "Practice Data Counts",
@@ -198,8 +214,15 @@
         },
         "segment": {
           "type": "string",
-          "pattern": "^[a-z0-9-]+$",
-          "description": "Optional segment slug as served by the endpoint, e.g. primary-care."
+          "enum": [
+            "primary-care",
+            "dental",
+            "pt-ot-speech",
+            "specialty-clinics",
+            "behavioral-health",
+            "derm-peds-vision-podiatry"
+          ],
+          "description": "Optional practice segment slug, one of the six served by the endpoint, e.g. primary-care."
         }
       },
       "additionalProperties": false

@@ -80,3 +80,38 @@ test('suppressed cell passes through as null, never 0', async () => {
   assert.strictEqual(cell.count, null);
   assert.strictEqual(cell.suppressed, true);
 });
+const SIX = ['primary-care', 'dental', 'pt-ot-speech', 'specialty-clinics', 'behavioral-health', 'derm-peds-vision-podiatry'];
+test('segment input schema is an enum of exactly the six slugs, in order', () => {
+  const spec = TOOLS.find(t => t.name === 'practice_data_counts');
+  assert.deepEqual(spec.inputSchema.properties.segment.enum, SIX);
+  assert.equal(spec.inputSchema.properties.segment.pattern, undefined);
+});
+test('unknown segment is a tool error and nothing is fetched', async () => {
+  for (const bad of ['unknown-slug', 'Primary-Care', '', 'primary-care ', 5]) {
+    const calls = mock();
+    const r = await invoke({ segment: bad });
+    assert.equal(r.isError, true);
+    assert.equal(calls.length, 0);
+  }
+});
+test('each of the six slugs passes validation and is fetched', async () => {
+  for (const slug of SIX) {
+    const calls = mock();
+    const r = await invoke({ segment: slug });
+    assert.equal(r.isError, undefined);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0][0], `${URL0}?segment=${slug}`);
+  }
+});
+test('mcp.json, glama-release/tools.json and TOOLS name the same six tools', async () => {
+  const { readFileSync } = await import('node:fs');
+  const rd = p => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
+  const names = TOOLS.map(t => t.name).sort();
+  assert.equal(names.length, 6);
+  assert.deepEqual(rd('mcp.json').tools.slice().sort(), names);
+  assert.deepEqual(rd('glama-release/tools.json').map(t => t.name).sort(), names);
+  const lc = TOOLS.find(t => t.name === 'list_categories');
+  const gl = rd('glama-release/tools.json').find(t => t.name === 'list_categories');
+  assert.equal(gl.description, lc.description);
+  assert.equal(gl.title, lc.title);
+});
