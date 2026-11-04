@@ -22,6 +22,7 @@
     "search_providers",
     "get_provider_detail",
     "list_categories",
-    "get_ehr_product_detail"
+    "get_ehr_product_detail",
+    "practice_data_counts"
   ]
 }

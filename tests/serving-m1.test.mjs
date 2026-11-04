@@ -432,7 +432,7 @@ test('tools/list: page stays uncapped, count stays declared, per_page ceiling un
   assert.equal(sp.inputSchema.properties.page.minimum, 1);
   assert.equal(sp.inputSchema.properties.per_page.maximum, 25);
   assert.ok(sp.outputSchema.properties.count);
-  assert.equal(TOOLS.length, 5); // C840 P2 adds the read-only product tool.
+  assert.equal(TOOLS.length, 6); // C840 P2 adds the read-only product tool; C1471 adds practice_data_counts.
 });
 
 // ---------------------------------------------------------------- 3. rate-control purpose
