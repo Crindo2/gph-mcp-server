@@ -21,6 +21,7 @@ import {
 } from './_shared/match-vocab.js';
 
 import { EHR_PRODUCT_TOOL, ehrProductDetail, validateEhrProductArgs } from './_shared/ehr-product-detail.js';
+import { PRACTICE_DATA_COUNTS_TOOL, practiceDataCounts, validatePracticeDataCountsArgs } from './_shared/practice-data-counts.js';
 
 const API_BASE = 'https://www.getpracticehelp.com/api';
 const AT_BASE = 'appvHqDMSu6aCwNxA';
@@ -476,6 +477,7 @@ export const TOOLS = [
     },
   },
   EHR_PRODUCT_TOOL,
+  PRACTICE_DATA_COUNTS_TOOL,
 ];
 
 const PROMPTS = [
@@ -552,6 +554,7 @@ function toolError(text) {
 // handlers, so additional named exports from a Functions module are inert at runtime.
 export function validateArgs(toolName, args) {
   if (toolName === EHR_PRODUCT_TOOL.name) return validateEhrProductArgs(args);
+  if (toolName === PRACTICE_DATA_COUNTS_TOOL.name) return validatePracticeDataCountsArgs(args);
   const spec = TOOLS.find(t => t.name === toolName);
   if (!spec) return null; // unknown tool -> callTool's own "Unknown tool" path handles it
   const props = (spec.inputSchema && spec.inputSchema.properties) || {};
@@ -673,6 +676,7 @@ function matchNeedsSummary(summary) {
 
 export async function callTool(name, args) {
   if (name === EHR_PRODUCT_TOOL.name) return ehrProductDetail(args);
+  if (name === PRACTICE_DATA_COUNTS_TOOL.name) return practiceDataCounts(args);
   if (name === 'list_categories') {
     const res = await fetch(`${API_BASE}/categories`);
     const data = await res.json().catch(() => ({}));
