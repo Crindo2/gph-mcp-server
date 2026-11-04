@@ -1,0 +1,58 @@
+{
+ "program_id": "GPH-PRACTICE-DATA-01",
+ "stage_id": "C1471-MCP-PRACTICE-DATA-COUNTS-REPAIR-1-REVERIFY",
+ "allocation_id": "ALLOC-REFILL-GPH-PRACTICE-DATA-01-C1471-MCP-PRACTICE-DATA-COUNTS-REPAIR-1-REVERIFY-d89c5218",
+ "worker_id": "WKR-REFILL-GPH-PRACTICE-DATA-01-C1471-MCP-PRACTICE-DATA-COUNTS-REPAIR-1-REVERIFY-236e7bbd",
+ "result": "VERIFY_PASS",
+ "model_used": "claude-sonnet-5-5",
+ "head": "e8025f83374321d457b78f7836818f6142923742",
+ "merge_base": "15db34eb426d7c719a4a46656eef457c47e5a23b",
+ "property": "Repair 1 head e8025f8 of branch cloud/c1471-mcp-practice-data-counts-repair-1 against current origin/main: six-slug segment enum shared by schema and validation, list_categories in Glama list, scope, listings, other five tools unchanged, 158 of 158 tests, four mutants caught.",
+ "summary": "VERIFY_PASS. Scope: 8 changed paths, all within the allowed set. Enum: exactly the six slugs in order in both TOOLS schema and validation; unknown slug returns tool error with zero fetch calls; state keeps ^[A-Z]{2}$; additionalProperties false. Tool: GET to the counts endpoint with only state and segment, no credentials, redirect manual, 10 s timeout, non-200/timeout/network map to tool errors, suppressed cell passes as null. Listings: mcp.json, glama tools.json and TOOLS all name the same six tools; the list_categories Glama entry matches TOOLS on name, title, description, annotations and inputSchema (it omits outputSchema, as every pre-existing Glama entry does; not a defect). README says no records and cells under 25 not published. mcp.js diff is purely additive (0 removed lines); byte-lock test change strips only the new entry. Tests: node --test tests/*.test.mjs gives 158 tests, 158 pass, 0 fail. Mutants (each failed tests then reverted): drop one slug 2 fail; accept unknown slug 2 fail; fill suppressed cell with 0 2 fail; follow redirects 1 fail. Live endpoint not called. Note: the repair branch tip is a later commit that only adds the _c877_ref return envelope; the verified head is the code commit named above.",
+ "findings": [],
+ "changed_paths": [
+  "README.md",
+  "functions/_shared/practice-data-counts.js",
+  "functions/mcp.js",
+  "glama-release/tools.json",
+  "mcp.json",
+  "tests/ehr-product-detail.test.mjs",
+  "tests/practice-data-counts.test.mjs",
+  "tests/serving-m1.test.mjs"
+ ],
+ "boundary": "Read only. No network beyond git. No deploy, dispatch, publish, migrate, apply or merge. No live endpoint call. Only _c877_ref files pushed to the packet branch.",
+ "blocker": "",
+ "material_exception": false,
+ "verified_blobs": {
+  "README.md": "6e0aadc87c4b1e75e8d08dfbe712fd9f2f39dce4",
+  "functions/_shared/practice-data-counts.js": "2eefdb55fdef43cb2361d04bad067c9a08a17f69",
+  "functions/mcp.js": "b95c3ee84c839791e849d6988feebe3f29798907",
+  "glama-release/tools.json": "eec6271c62a3d2ad4329eb4c9239c539c7510c06",
+  "mcp.json": "470abe97092edd834c530be8e21ee7983d535801",
+  "tests/ehr-product-detail.test.mjs": "60a95c0fc1dc84b411fae03c15a2c113507867e2",
+  "tests/practice-data-counts.test.mjs": "c0ff3d25e385df551e279ec25839b371bf28155a",
+  "tests/serving-m1.test.mjs": "0c0446a79d818752a03b63acd834bf61bc58d2b7"
+ },
+ "verified_deletions": [],
+ "workspace": "removed",
+ "independence_attestation": {
+  "fresh_seat": true,
+  "read_from": [
+   "_c877_ref/BRIEF.md",
+   "_c877_ref/ENVELOPE-SCHEMA.md",
+   "git objects of Crindo2/gph-mcp-server head e8025f83374321d457b78f7836818f6142923742 and origin/main"
+  ],
+  "never_had_access_to": [
+   "the builder lane",
+   "the repair lane",
+   "the first verify lane",
+   "the controller session"
+  ]
+ },
+ "evidence": [
+  {
+   "path": "_c877_ref/evidence-reverify.txt",
+   "sha256": "1729478c72c444a91943a1c196d1dc463d6762f6c8633a7c541a6e4ebed49e73"
+  }
+ ]
+}

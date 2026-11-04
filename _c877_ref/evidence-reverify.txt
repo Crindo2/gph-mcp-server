@@ -1,0 +1,13 @@
+Reverify of head e8025f83374321d457b78f7836818f6142923742
+merge_base 15db34eb426d7c719a4a46656eef457c47e5a23b
+tests: 158 pass 0 fail
+mutants: drop slug 2 fail; accept unknown 2 fail; suppressed->0 2 fail; follow redirects 1 fail
+changed paths:
+6e0aadc87c4b1e75e8d08dfbe712fd9f2f39dce4 README.md
+2eefdb55fdef43cb2361d04bad067c9a08a17f69 functions/_shared/practice-data-counts.js
+b95c3ee84c839791e849d6988feebe3f29798907 functions/mcp.js
+eec6271c62a3d2ad4329eb4c9239c539c7510c06 glama-release/tools.json
+470abe97092edd834c530be8e21ee7983d535801 mcp.json
+60a95c0fc1dc84b411fae03c15a2c113507867e2 tests/ehr-product-detail.test.mjs
+c0ff3d25e385df551e279ec25839b371bf28155a tests/practice-data-counts.test.mjs
+0c0446a79d818752a03b63acd834bf61bc58d2b7 tests/serving-m1.test.mjs
