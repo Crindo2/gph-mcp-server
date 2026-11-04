@@ -1,0 +1,53 @@
+{
+ "program_id": "GPH-PRACTICE-DATA-01",
+ "stage_id": "C1471-MCP-PRACTICE-DATA-COUNTS-VERIFY",
+ "allocation_id": "ALLOC-REFILL-GPH-PRACTICE-DATA-01-C1471-MCP-PRACTICE-DATA-COUNTS-VERIFY-35903c8d",
+ "worker_id": "WKR-REFILL-GPH-PRACTICE-DATA-01-C1471-MCP-PRACTICE-DATA-COUNTS-VERIFY-35b55fb6",
+ "result": "VERIFY_FAIL",
+ "head": "7fe025ce8ceb325330ba1dd7ce944d6f85af1b48",
+ "model_used": "claude-sonnet-5-5",
+ "merge_base": "15db34eb426d7c719a4a46656eef457c47e5a23b",
+ "property": "cold non-author verify of practice_data_counts at head against current origin/main",
+ "summary": "VERIFY_FAIL on two brief checks, otherwise sound. Step 2: segment input is the generic pattern ^[a-z0-9-]+$, not the 6 endpoint slugs the brief requires (no enum); the slugs are not in the repo so the builder could not encode them. Step 4: glama-release/tools.json lists 5 tools, not 6, because list_categories was already absent at the merge base; mcp.json lists 6; README adds a section but states no tool count. Passing: scope matches the 8 expected paths exactly; mcp.js wiring is additive (import, TOOLS entry, validateArgs and callTool branches); byte-lock test change covers only the added TOOLS entry; fetch is GET, no credentials, redirect manual, 10 s timeout; non-200, timeout, network and bad JSON map to tool errors; suppressed cell passes through as null; full suite 154 tests pass 0 fail; mutants (drop state pattern, fill suppressed with 0, follow redirects) each failed tests (2, 2, 1 failures) and were reverted. Live endpoint not called.",
+ "findings": [
+  "step2: segment has no 6-slug enum, only a generic slug pattern",
+  "step4: glama-release/tools.json lists 5 tools (pre-existing omission of list_categories), brief expects 6",
+  "step5: head 7fe025c is an ancestor of the builder branch tip dcb1957, which only adds the return envelope"
+ ],
+ "boundary": "Read only; no network beyond git, no deploy, no merge, no live endpoint call. Only _c877_ref files pushed to the verify packet branch.",
+ "blocker": "",
+ "material_exception": true,
+ "verified_blobs": {
+  "README.md": "6e0aadc87c4b1e75e8d08dfbe712fd9f2f39dce4",
+  "functions/_shared/practice-data-counts.js": "c4b064484b70f612c0ccadb436ec600e8b08353e",
+  "functions/mcp.js": "b95c3ee84c839791e849d6988feebe3f29798907",
+  "glama-release/tools.json": "54df68183cbe03e2c753916a2076a1ce4def308c",
+  "mcp.json": "470abe97092edd834c530be8e21ee7983d535801",
+  "tests/ehr-product-detail.test.mjs": "60a95c0fc1dc84b411fae03c15a2c113507867e2",
+  "tests/practice-data-counts.test.mjs": "4115c7eb6b34b0d7792c7bea7230507e897c2291",
+  "tests/serving-m1.test.mjs": "0c0446a79d818752a03b63acd834bf61bc58d2b7"
+ },
+ "verified_deletions": [],
+ "independence_attestation": {
+  "fresh_seat": true,
+  "read_from": [
+   "_c877_ref/BRIEF.md",
+   "_c877_ref/ENVELOPE-SCHEMA.md",
+   "git objects of the head and origin/main"
+  ],
+  "never_had_access_to": [
+   "the builder lane",
+   "the controller session"
+  ]
+ },
+ "workspace": "removed",
+ "changed_paths": [
+  "_c877_ref/return.json"
+ ],
+ "evidence": [
+  {
+   "path": "_c877_ref/BRIEF.md",
+   "sha256": "51ff9dd2e46feb9b1815313a953baf2614aa83ecfce15eee5732c07cb7dbc591"
+  }
+ ]
+}
