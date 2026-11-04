@@ -1,0 +1,63 @@
+{
+ "program_id": "GPH-PRACTICE-DATA-01",
+ "stage_id": "C1471-MCP-PRACTICE-DATA-COUNTS",
+ "allocation_id": "ALLOC-REFILL-GPH-PRACTICE-DATA-01-C1471-MCP-PRACTICE-DATA-COUNTS-92c9b668",
+ "worker_id": "WKR-REFILL-GPH-PRACTICE-DATA-01-C1471-MCP-PRACTICE-DATA-COUNTS-6e87cd98",
+ "result": "NEEDS_VERIFY",
+ "model_used": "claude-sonnet-5-5",
+ "head": "7fe025ce8ceb325330ba1dd7ce944d6f85af1b48",
+ "outcome": "practice_data_counts sixth MCP tool added with tests, listings and README; branch cloud/c1471-mcp-practice-data-counts-b",
+ "summary": "Added practice_data_counts (functions/_shared/practice-data-counts.js), wired into TOOLS, validateArgs and callTool in mcp.js. GET to the counts endpoint with optional state and segment, redirect manual, 10s timeout, non-200 and failures map to tool errors. New tests/practice-data-counts.test.mjs (7 tests, fetch stubbed). Byte-lock test and serving-m1 tool count (5 to 6) updated. Full suite node --test tests/*.test.mjs: 154 tests, 154 pass, 0 fail. Mutants: dropping the state pattern fails 1 test; filling a suppressed cell with 0 fails 2 tests; both reverted. glama-release/tools.json, mcp.json and README updated; server.json lists no tools so unchanged. No live network used.",
+ "boundary": "Only the files named in the brief changed; no main push, deploy, PR, secret or production write. The other five tools are unchanged.",
+ "blocker": "",
+ "material_exception": false,
+ "findings": [
+  "The segment enum could not be filled: no network access beyond git and the repo contains only one segment slug (primary-care). The brief forbids inventing slugs, so segment is constrained by pattern ^[a-z0-9-]+$ instead of an enum of 6. Verifier or controller should replace it with the 6 served slugs from the live response or Worker source.",
+  "Live endpoint parity not checked from this session; verify against the deployed endpoint."
+ ],
+ "changed_paths": [
+  "README.md",
+  "functions/_shared/practice-data-counts.js",
+  "functions/mcp.js",
+  "glama-release/tools.json",
+  "mcp.json",
+  "tests/ehr-product-detail.test.mjs",
+  "tests/practice-data-counts.test.mjs",
+  "tests/serving-m1.test.mjs",
+  "_c877_ref/return.json"
+ ],
+ "evidence": [
+  {
+   "path": "README.md",
+   "sha256": "57f949c1e3b5a42e410b41ef2de1aed0600fbd21b20afe9fa6a6ea828f9b847e"
+  },
+  {
+   "path": "functions/_shared/practice-data-counts.js",
+   "sha256": "be1f4b92ef7c3048522c2b75770787d973c67660f8b090e2809d87bb9875174e"
+  },
+  {
+   "path": "functions/mcp.js",
+   "sha256": "50926f73ec137b452790722801efba21e3c2775af1da0a9bd2b34e929a1e3087"
+  },
+  {
+   "path": "glama-release/tools.json",
+   "sha256": "bae011d824b16d51428fd4a5ee611ee12481d2e53dfdbe429c6b67a05ebd92dc"
+  },
+  {
+   "path": "mcp.json",
+   "sha256": "9e8bf029ed3ab719b30e3d1ded836df9f5f46e1aa44ff62d765d665ba624e826"
+  },
+  {
+   "path": "tests/ehr-product-detail.test.mjs",
+   "sha256": "a768664e9f2bb12ff3b532ff9355f46e73f1541d257306d856ecf3c6323ca90e"
+  },
+  {
+   "path": "tests/practice-data-counts.test.mjs",
+   "sha256": "bce010bf3bfc49ca2b422183daf16e58a250b942d19ac4fd981d08eaa0f76f4e"
+  },
+  {
+   "path": "tests/serving-m1.test.mjs",
+   "sha256": "4c480d3ccab5005d42b2034f2abbb18403a70c040aac466835c12570aae2664f"
+  }
+ ]
+}
