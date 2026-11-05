@@ -197,7 +197,7 @@
   {
     "name": "practice_data_counts",
     "title": "Practice Data Counts",
-    "description": "Headline practice counts by US state and practice segment, from the public Practice Data aggregate endpoint. Aggregate counts only: no records are exposed, and cells with fewer than 25 practices are not published (returned with count null and suppressed true). Optional state and segment filters narrow the result; the JSON body is returned unchanged.",
+    "description": "Counts practices with headline (strongest-tier) evidence only, by US state and practice segment, from the public Practice Data aggregate endpoint (unit: practices (headline evidence)). It excludes lower-evidence records, so these numbers are lower than the all-record totals on the Practice Data product pages (507,423 nationally as published there). Cells with fewer than 25 practices are not published (returned with count null and suppressed true). Aggregate counts only: no records or names are returned. Optional state and segment filters narrow the result; the JSON body is returned unchanged.",
     "annotations": {
       "readOnlyHint": true,
       "idempotentHint": true,
