@@ -1,0 +1,56 @@
+{
+ "program_id": "GPH-PRACTICE-DATA-01--COUNTS-DEFINITION",
+ "stage_id": "C1490-COUNTS-DEFINITION",
+ "allocation_id": "ALLOC-REFILL-GPH-PRACTICE-DATA-01--COUNTS-DEFINITION-C1490-COUNTS-DEFINITION-9d41ab04",
+ "worker_id": "WKR-REFILL-GPH-PRACTICE-DATA-01--COUNTS-DEFINITION-C1490-COUNTS-DEFINITION-e6072915",
+ "result": "NEEDS_VERIFY",
+ "model_used": "claude-sonnet-5-5",
+ "head": "945af896181024ca034b4c1ae2f340e3b189d5ad",
+ "outcome": "practice_data_counts description, README and glama listing now state it counts headline-evidence practices only, excludes lower-evidence records, suppresses cells under 25, and is lower than the 507,423 all-record product total",
+ "summary": "Chose to describe exactly rather than change numbers (per ruling). Description in functions/_shared/practice-data-counts.js mirrored in glama-release/tools.json and README. mcp.json lists tool name only, so unchanged. No change to URL, input schema or response handling. Added a test that the description contains headline and lower-evidence. node --test tests/*.test.mjs: 159 tests, 159 pass, 0 fail (baseline 158). Branch is based on current origin/main.",
+ "boundary": "Description text, listings and tests only; no deploy, PR, merge, network or production writes.",
+ "blocker": "",
+ "material_exception": false,
+ "findings": [
+  "mcp.json contains only the tool name for practice_data_counts, no description, so it needed no edit.",
+  "Byte-lock tests: none existed for this description; existing listing tests unaffected."
+ ],
+ "changed_paths": [
+  "README.md",
+  "_c877_ref/BRIEF.md",
+  "_c877_ref/ENVELOPE-SCHEMA.md",
+  "functions/_shared/practice-data-counts.js",
+  "glama-release/tools.json",
+  "tests/practice-data-counts.test.mjs"
+ ],
+ "evidence": [
+  {
+   "path": "README.md",
+   "sha256": "3d593bf197fcf27e261b4fa467a3e410954e1304ca66c4777d905ea9c7f3fea0"
+  },
+  {
+   "path": "_c877_ref/BRIEF.md",
+   "sha256": "b65fdc07516d7b2ca8381359054088acf75357e8f35250984618b85009873be9"
+  },
+  {
+   "path": "_c877_ref/ENVELOPE-SCHEMA.md",
+   "sha256": "a66afc6c4ebd9a0ee4efe939ed9140f9e5f26deab49cc773d22c5c96a1dd0f80"
+  },
+  {
+   "path": "functions/_shared/practice-data-counts.js",
+   "sha256": "411ea04cdbdd2536a4e4b359be1a29006af1d22c5f26e9a915bef13a52bacf00"
+  },
+  {
+   "path": "glama-release/tools.json",
+   "sha256": "46f09cdda8f1204db3a66bac581c81a07fddcf7ea210878ece978bca1e0655b4"
+  },
+  {
+   "path": "tests/practice-data-counts.test.mjs",
+   "sha256": "9101e3b5c245f491f9d562890fe65b2894356ee694e2b3defca675b3cda83ce6"
+  },
+  {
+   "path": "_c877_ref/test-output.txt",
+   "sha256": "dc9f8f55afd15859e399222b11a13bef7647fe06d50bce03ea39fb45d2e65dca"
+  }
+ ]
+}

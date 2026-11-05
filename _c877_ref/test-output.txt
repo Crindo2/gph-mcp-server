@@ -1,0 +1,1333 @@
+TAP version 13
+# (node:782) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/user/gph-mcp-server/functions/mcp.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/user/gph-mcp-server/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: S3: the whole-corpus exhibit is rejected instead of answered
+ok 1 - S3: the whole-corpus exhibit is rejected instead of answered
+  ---
+  duration_ms: 1.991745
+  type: 'test'
+  ...
+# Subtest: S3: a bare call missing only the required arg names it and points at list_categories
+ok 2 - S3: a bare call missing only the required arg names it and points at list_categories
+  ---
+  duration_ms: 0.308077
+  type: 'test'
+  ...
+# Subtest: S3: match_practice enforces both of its required args
+ok 3 - S3: match_practice enforces both of its required args
+  ---
+  duration_ms: 0.233146
+  type: 'test'
+  ...
+# Subtest: S3: get_provider_detail enforces slug
+ok 4 - S3: get_provider_detail enforces slug
+  ---
+  duration_ms: 0.152292
+  type: 'test'
+  ...
+# Subtest: S3: empty-string and whitespace are treated as absent, not as a value
+ok 5 - S3: empty-string and whitespace are treated as absent, not as a value
+  ---
+  duration_ms: 0.123677
+  type: 'test'
+  ...
+# Subtest: S4: the TX exhibit -- state_abbr no longer silently widens to national
+ok 6 - S4: the TX exhibit -- state_abbr no longer silently widens to national
+  ---
+  duration_ms: 0.153914
+  type: 'test'
+  ...
+# Subtest: S4: every off-schema arg observed in production is rejected with the right hint
+ok 7 - S4: every off-schema arg observed in production is rejected with the right hint
+  ---
+  duration_ms: 0.337289
+  type: 'test'
+  ...
+# Subtest: S4: specialty on search_providers routes the caller to match_practice
+ok 8 - S4: specialty on search_providers routes the caller to match_practice
+  ---
+  duration_ms: 0.187519
+  type: 'test'
+  ...
+# Subtest: S4: multiple unknown args are all named in one error
+ok 9 - S4: multiple unknown args are all named in one error
+  ---
+  duration_ms: 0.27094
+  type: 'test'
+  ...
+# Subtest: correct callers still pass -- verbatim organic forms from the baseline window
+ok 10 - correct callers still pass -- verbatim organic forms from the baseline window
+  ---
+  duration_ms: 0.465699
+  type: 'test'
+  ...
+# Subtest: list_categories takes no arguments and requires none
+ok 11 - list_categories takes no arguments and requires none
+  ---
+  duration_ms: 0.164558
+  type: 'test'
+  ...
+# Subtest: an unknown tool name is left to callTool, not rejected here
+ok 12 - an unknown tool name is left to callTool, not rejected here
+  ---
+  duration_ms: 0.086423
+  type: 'test'
+  ...
+# (node:783) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/user/gph-mcp-server/functions/mcp.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/user/gph-mcp-server/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: caller_class matches the corpus with only explicit C812 internal overrides
+ok 13 - caller_class matches the corpus with only explicit C812 internal overrides
+  ---
+  duration_ms: 3.019943
+  type: 'test'
+  ...
+# Subtest: the new AI-crawler branch changes nothing the corpus has actually seen
+ok 14 - the new AI-crawler branch changes nothing the corpus has actually seen
+  ---
+  duration_ms: 0.353606
+  type: 'test'
+  ...
+# Subtest: the Codex CLI is a developer tool, not organic end-user demand
+ok 15 - the Codex CLI is a developer tool, not organic end-user demand
+  ---
+  duration_ms: 0.410505
+  type: 'test'
+  ...
+# Subtest: an end-user assistant fetch and a developer agent are different rows
+ok 16 - an end-user assistant fetch and a developer agent are different rows
+  ---
+  duration_ms: 0.488558
+  type: 'test'
+  ...
+# Subtest: ChatGPT-User and Perplexity-User are end-user, their crawlers are not
+ok 17 - ChatGPT-User and Perplexity-User are end-user, their crawlers are not
+  ---
+  duration_ms: 2.018021
+  type: 'test'
+  ...
+# Subtest: a real browser is the only thing that can be classed human
+ok 18 - a real browser is the only thing that can be classed human
+  ---
+  duration_ms: 1.609063
+  type: 'test'
+  ...
+# Subtest: a Mozilla/5.0 prefix alone never buys a human classification
+ok 19 - a Mozilla/5.0 prefix alone never buys a human classification
+  ---
+  duration_ms: 0.438457
+  type: 'test'
+  ...
+# Subtest: an absent user-agent is unattributed, never human
+ok 20 - an absent user-agent is unattributed, never human
+  ---
+  duration_ms: 0.160998
+  type: 'test'
+  ...
+# Subtest: the generic HTTP clients that used to land in `unknown` are bots
+ok 21 - the generic HTTP clients that used to land in `unknown` are bots
+  ---
+  duration_ms: 0.860585
+  type: 'test'
+  ...
+# Subtest: every corpus user-agent resolves to exactly the expected kind and intent
+ok 22 - every corpus user-agent resolves to exactly the expected kind and intent
+  ---
+  duration_ms: 1.15779
+  type: 'test'
+  ...
+# Subtest: caller_kind is always one of the five declared values
+ok 23 - caller_kind is always one of the five declared values
+  ---
+  duration_ms: 2.972059
+  type: 'test'
+  ...
+# Subtest: agent_intent is set if and only if the row is a model_agent
+ok 24 - agent_intent is set if and only if the row is a model_agent
+  ---
+  duration_ms: 1.188376
+  type: 'test'
+  ...
+# Subtest: an assistant web Origin is an end-user model_agent, but a dev tool stays a dev tool
+ok 25 - an assistant web Origin is an end-user model_agent, but a dev tool stays a dev tool
+  ---
+  duration_ms: 0.754254
+  type: 'test'
+  ...
+# Subtest: our own harness is never hidden inside another class
+ok 26 - our own harness is never hidden inside another class
+  ---
+  duration_ms: 0.206714
+  type: 'test'
+  ...
+# Subtest: caller_agent is a bounded, sanitised slug -- never raw user-agent text
+ok 27 - caller_agent is a bounded, sanitised slug -- never raw user-agent text
+  ---
+  duration_ms: 0.210135
+  type: 'test'
+  ...
+# Subtest: the classifier is pure -- same inputs, same outputs, no network, no clock
+ok 28 - the classifier is pure -- same inputs, same outputs, no network, no clock
+  ---
+  duration_ms: 0.846878
+  type: 'test'
+  ...
+# Subtest: the corpus, cut on the new dimension, states what it measures
+ok 29 - the corpus, cut on the new dimension, states what it measures
+  ---
+  duration_ms: 0.196927
+  type: 'test'
+  ...
+# Subtest: C812: known estate callers are internal with or without an assistant Origin
+ok 30 - C812: known estate callers are internal with or without an assistant Origin
+  ---
+  duration_ms: 0.273393
+  type: 'test'
+  ...
+# Subtest: C812: other assistant clients are not assumed estate-owned
+ok 31 - C812: other assistant clients are not assumed estate-owned
+  ---
+  duration_ms: 0.110173
+  type: 'test'
+  ...
+# Subtest: C812: corpus counts separate internal traffic from the organic rollup input
+ok 32 - C812: corpus counts separate internal traffic from the organic rollup input
+  ---
+  duration_ms: 0.217835
+  type: 'test'
+  ...
+# (node:789) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/user/gph-mcp-server/functions/mcp.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/user/gph-mcp-server/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: product tool is additive in discovery and catalogs
+ok 33 - product tool is additive in discovery and catalogs
+  ---
+  duration_ms: 2.85831
+  type: 'test'
+  ...
+# Subtest: all existing definitions remain byte-identical and runtime-identical
+ok 34 - all existing definitions remain byte-identical and runtime-identical
+  ---
+  duration_ms: 1.029587
+  type: 'test'
+  ...
+# Subtest: HTTP/MCP parity via served path, GET only, no credentials, bounded timeout
+ok 35 - HTTP/MCP parity via served path, GET only, no credentials, bounded timeout
+  ---
+  duration_ms: 24.978069
+  type: 'test'
+  ...
+# Subtest: product fetch init uses only Workers-supported options
+ok 36 - product fetch init uses only Workers-supported options
+  ---
+  duration_ms: 0.626374
+  type: 'test'
+  ...
+# Subtest: unknowns, null/absent open bounds and typed values survive unchanged
+ok 37 - unknowns, null/absent open bounds and typed values survive unchanged
+  ---
+  duration_ms: 1.897387
+  type: 'test'
+  ...
+# Subtest: edition identity validates without filtering or inheritance
+ok 38 - edition identity validates without filtering or inheritance
+  ---
+  duration_ms: 1.182275
+  type: 'test'
+  ...
+# Subtest: unknown, empty and wrong-parent edition identities fail cleanly
+ok 39 - unknown, empty and wrong-parent edition identities fail cleanly
+  ---
+  duration_ms: 1.163348
+  type: 'test'
+  ...
+# Subtest: invalid identities and aliases never fetch; validation matches execution
+ok 40 - invalid identities and aliases never fetch; validation matches execution
+  ---
+  duration_ms: 0.822443
+  type: 'test'
+  ...
+# Subtest: extra arguments reject without fetching
+ok 41 - extra arguments reject without fetching
+  ---
+  duration_ms: 0.278873
+  type: 'test'
+  ...
+# Subtest: unknown product mirrors projection HTTP 404 JSON
+ok 42 - unknown product mirrors projection HTTP 404 JSON
+  ---
+  duration_ms: 1.121549
+  type: 'test'
+  ...
+# Subtest: all upstream 3xx responses are rejected without following or reading the body
+ok 43 - all upstream 3xx responses are rejected without following or reading the body
+  ---
+  duration_ms: 5.922108
+  type: 'test'
+  ...
+# Subtest: upstream errors, malformed JSON and timeout failures are clean tool errors
+ok 44 - upstream errors, malformed JSON and timeout failures are clean tool errors
+  ---
+  duration_ms: 0.935142
+  type: 'test'
+  ...
+# (node:803) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/user/gph-mcp-server/functions/mcp.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/user/gph-mcp-server/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: DIFFERENTIAL 1/3: this repo's resolver block is byte-identical to the pinned contract
+ok 45 - DIFFERENTIAL 1/3: this repo's resolver block is byte-identical to the pinned contract
+  ---
+  duration_ms: 1.884077
+  type: 'test'
+  ...
+# Subtest: DIFFERENTIAL 2/3: the shared fixture and expected output are the pinned ones
+ok 46 - DIFFERENTIAL 2/3: the shared fixture and expected output are the pinned ones
+  ---
+  duration_ms: 0.340543
+  type: 'test'
+  ...
+# Subtest: DIFFERENTIAL 3/3: same input row set -> identical output (fail on divergence)
+ok 47 - DIFFERENTIAL 3/3: same input row set -> identical output (fail on divergence)
+  ---
+  duration_ms: 1.784608
+  type: 'test'
+  ...
+# Subtest: Y2.1: an unenriched row resolves to the verbatim pre-P2 legacy values
+ok 48 - Y2.1: an unenriched row resolves to the verbatim pre-P2 legacy values
+  ---
+  duration_ms: 0.292276
+  type: 'test'
+  ...
+# Subtest: Y2.1: an unenriched row with a NULL description resolves to null, not to the empty string
+ok 49 - Y2.1: an unenriched row with a NULL description resolves to null, not to the empty string
+  ---
+  duration_ms: 0.312192
+  type: 'test'
+  ...
+# Subtest: Y2.2: apollo_founded_year never becomes a rendered founding year, enriched or not
+ok 50 - Y2.2: apollo_founded_year never becomes a rendered founding year, enriched or not
+  ---
+  duration_ms: 0.505876
+  type: 'test'
+  ...
+# Subtest: Y2.3: where enriched and Apollo founding years disagree, the enriched value wins and Apollo is not rendered
+ok 51 - Y2.3: where enriched and Apollo founding years disagree, the enriched value wins and Apollo is not rendered
+  ---
+  duration_ms: 1.208025
+  type: 'test'
+  ...
+# Subtest: Y2.3: agreeing years are not reported as a disagreement
+ok 52 - Y2.3: agreeing years are not reported as a disagreement
+  ---
+  duration_ms: 0.24313
+  type: 'test'
+  ...
+# Subtest: Q1: a NULL provenance never withholds enriched content (5,713 of 5,715 rows)
+ok 53 - Q1: a NULL provenance never withholds enriched content (5,713 of 5,715 rows)
+  ---
+  duration_ms: 0.384632
+  type: 'test'
+  ...
+# Subtest: Z1: the resolver does not carry `provenance` out at all
+ok 54 - Z1: the resolver does not carry `provenance` out at all
+  ---
+  duration_ms: 0.675724
+  type: 'test'
+  ...
+# Subtest: Z1: id 3724 -- a provenance merge record never reaches the label
+ok 55 - Z1: id 3724 -- a provenance merge record never reaches the label
+  ---
+  duration_ms: 0.566431
+  type: 'test'
+  ...
+# Subtest: Z1: an operational note carrying contact details cannot become public copy
+ok 56 - Z1: an operational note carrying contact details cannot become public copy
+  ---
+  duration_ms: 0.272462
+  type: 'test'
+  ...
+# Subtest: Z1.2: a whole extraction-rationale SENTENCE renders no source clause (178 rows)
+ok 57 - Z1.2: a whole extraction-rationale SENTENCE renders no source clause (178 rows)
+  ---
+  duration_ms: 3.398627
+  type: 'test'
+  ...
+# Subtest: Z1.3: `serper` and `none` render no source clause (1,026 + 120 rows)
+ok 58 - Z1.3: `serper` and `none` render no source clause (1,026 + 120 rows)
+  ---
+  duration_ms: 0.263447
+  type: 'test'
+  ...
+# Subtest: Z1: the label vocabulary is closed -- arbitrary column contents emit nothing
+ok 59 - Z1: the label vocabulary is closed -- arbitrary column contents emit nothing
+  ---
+  duration_ms: 0.528551
+  type: 'test'
+  ...
+# Subtest: empty-array encodings read as absent, not as an empty section
+ok 60 - empty-array encodings read as absent, not as an empty section
+  ---
+  duration_ms: 0.145595
+  type: 'test'
+  ...
+# (node:810) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/user/gph-mcp-server/functions/mcp.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/user/gph-mcp-server/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: B1 copied vocabulary matches the upstream lock; its dependency preserves the pinned resolver
+ok 61 - B1 copied vocabulary matches the upstream lock; its dependency preserves the pinned resolver
+  ---
+  duration_ms: 2.70403
+  type: 'test'
+  ...
+# Subtest: B1 advertises exact enums, array limits and conditional state requirement
+ok 62 - B1 advertises exact enums, array limits and conditional state requirement
+  ---
+  duration_ms: 0.709606
+  type: 'test'
+  ...
+# Subtest: B1 state may be omitted only for national preferences; category remains required
+ok 63 - B1 state may be omitted only for national preferences; category remains required
+  ---
+  duration_ms: 0.869876
+  type: 'test'
+  ...
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# Subtest: B1 invalid types, free text, duplicate/over-limit codes and invented enums never reach upstream
+ok 64 - B1 invalid types, free text, duplicate/over-limit codes and invented enums never reach upstream
+  ---
+  duration_ms: 31.159659
+  type: 'test'
+  ...
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# Subtest: B1 golden fields and all geo preferences are forwarded unchanged through tools/call
+ok 65 - B1 golden fields and all geo preferences are forwarded unchanged through tools/call
+  ---
+  duration_ms: 4.461611
+  type: 'test'
+  ...
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# Subtest: B1 national requests without state run and forward no invented state
+ok 66 - B1 national requests without state run and forward no invented state
+  ---
+  duration_ms: 1.423266
+  type: 'test'
+  ...
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# Subtest: old-style category plus state still works, preserving payload, count, slugs and text
+ok 67 - old-style category plus state still works, preserving payload, count, slugs and text
+  ---
+  duration_ms: 1.073188
+  type: 'test'
+  ...
+# Subtest: B1 renders every closed need/evidence/source/geography label and public extraction labels
+ok 68 - B1 renders every closed need/evidence/source/geography label and public extraction labels
+  ---
+  duration_ms: 2.599985
+  type: 'test'
+  ...
+# Subtest: B1 unknown/hostile evidence values and malformed dates cannot become public copy
+ok 69 - B1 unknown/hostile evidence values and malformed dates cannot become public copy
+  ---
+  duration_ms: 0.852631
+  type: 'test'
+  ...
+# Subtest: B1 summary honestly distinguishes API top-ten evidence from displayed top five
+ok 70 - B1 summary honestly distinguishes API top-ten evidence from displayed top five
+  ---
+  duration_ms: 0.833188
+  type: 'test'
+  ...
+# Subtest: B1 upstream applicability errors remain errors, without fabricated matches
+ok 71 - B1 upstream applicability errors remain errors, without fabricated matches
+  ---
+  duration_ms: 4.168751
+  type: 'test'
+  ...
+# Subtest: C596 B1 dimensions reach telemetry without changing traffic classification
+ok 72 - C596 B1 dimensions reach telemetry without changing traffic classification
+  ---
+  duration_ms: 0.725024
+  type: 'test'
+  ...
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# writeTelemetryD1: TELEMETRY_DB not bound -- D1 telemetry skipped
+# Subtest: C596 migration lag preserves the existing telemetry row via M2 fallback
+ok 73 - C596 migration lag preserves the existing telemetry row via M2 fallback
+  ---
+  duration_ms: 4.007605
+  type: 'test'
+  ...
+# (node:816) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/user/gph-mcp-server/functions/mcp.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/user/gph-mcp-server/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: tools/list shows 6 tools including practice_data_counts
+ok 74 - tools/list shows 6 tools including practice_data_counts
+  ---
+  duration_ms: 1.287097
+  type: 'test'
+  ...
+# Subtest: no arguments: bare URL, GET, manual redirect, no credentials, timeout
+ok 75 - no arguments: bare URL, GET, manual redirect, no credentials, timeout
+  ---
+  duration_ms: 22.065828
+  type: 'test'
+  ...
+# Subtest: filters build the query
+ok 76 - filters build the query
+  ---
+  duration_ms: 1.620138
+  type: 'test'
+  ...
+# Subtest: invalid arguments never fetch
+ok 77 - invalid arguments never fetch
+  ---
+  duration_ms: 0.8784
+  type: 'test'
+  ...
+# Subtest: upstream 400, 500 and other non-200 map to tool errors, no count
+ok 78 - upstream 400, 500 and other non-200 map to tool errors, no count
+  ---
+  duration_ms: 1.818423
+  type: 'test'
+  ...
+# Subtest: timeout, network failure and malformed JSON map to tool errors
+ok 79 - timeout, network failure and malformed JSON map to tool errors
+  ---
+  duration_ms: 1.23433
+  type: 'test'
+  ...
+# Subtest: suppressed cell passes through as null, never 0
+ok 80 - suppressed cell passes through as null, never 0
+  ---
+  duration_ms: 0.637386
+  type: 'test'
+  ...
+# Subtest: segment input schema is an enum of exactly the six slugs, in order
+ok 81 - segment input schema is an enum of exactly the six slugs, in order
+  ---
+  duration_ms: 0.238727
+  type: 'test'
+  ...
+# Subtest: unknown segment is a tool error and nothing is fetched
+ok 82 - unknown segment is a tool error and nothing is fetched
+  ---
+  duration_ms: 0.309508
+  type: 'test'
+  ...
+# Subtest: each of the six slugs passes validation and is fetched
+ok 83 - each of the six slugs passes validation and is fetched
+  ---
+  duration_ms: 1.950013
+  type: 'test'
+  ...
+# Subtest: mcp.json, glama-release/tools.json and TOOLS name the same six tools
+ok 84 - mcp.json, glama-release/tools.json and TOOLS name the same six tools
+  ---
+  duration_ms: 1.325792
+  type: 'test'
+  ...
+# Subtest: description says exactly what is counted (C1490)
+ok 85 - description says exactly what is counted (C1490)
+  ---
+  duration_ms: 0.208173
+  type: 'test'
+  ...
+# (node:824) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/user/gph-mcp-server/functions/mcp.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/user/gph-mcp-server/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: C50 change 2 (MCP): an enriched row whose extractor abstained on size names the legacy source on the size line
+ok 86 - C50 change 2 (MCP): an enriched row whose extractor abstained on size names the legacy source on the size line
+  ---
+  duration_ms: 1.769726
+  type: 'test'
+  ...
+# Subtest: C50 change 2 (MCP): an enriched row whose size IS extracted carries no note
+ok 87 - C50 change 2 (MCP): an enriched row whose size IS extracted carries no note
+  ---
+  duration_ms: 0.302573
+  type: 'test'
+  ...
+# Subtest: C50 change 2 (MCP): an unenriched row renders no claim and no note (Y2.1)
+ok 88 - C50 change 2 (MCP): an unenriched row renders no claim and no note (Y2.1)
+  ---
+  duration_ms: 1.484528
+  type: 'test'
+  ...
+# (node:835) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/user/gph-mcp-server/functions/mcp.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/user/gph-mcp-server/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: ENUM: search_providers.practice_size_fit enum == the closed set, exactly
+ok 89 - ENUM: search_providers.practice_size_fit enum == the closed set, exactly
+  ---
+  duration_ms: 2.419852
+  type: 'test'
+  ...
+# Subtest: ENUM: match_practice.practice_size enum == the closed set minus 'All'
+ok 90 - ENUM: match_practice.practice_size enum == the closed set minus 'All'
+  ---
+  duration_ms: 0.323473
+  type: 'test'
+  ...
+# Subtest: RENDER: the size line carries the vocabulary label -- enriched Medium renders Mid-size
+ok 91 - RENDER: the size line carries the vocabulary label -- enriched Medium renders Mid-size
+  ---
+  duration_ms: 1.137426
+  type: 'test'
+  ...
+# Subtest: RENDER: legacy Solo/Small renders unchanged; legacy Mid-size renders unchanged (unenriched rows, Y2.1)
+ok 92 - RENDER: legacy Solo/Small renders unchanged; legacy Mid-size renders unchanged (unenriched rows, Y2.1)
+  ---
+  duration_ms: 0.347829
+  type: 'test'
+  ...
+# Subtest: C77-b(1): both columns NULL -> NO size line and no invented literal anywhere in the profile
+ok 93 - C77-b(1): both columns NULL -> NO size line and no invented literal anywhere in the profile
+  ---
+  duration_ms: 0.848596
+  type: 'test'
+  ...
+# Subtest: C77-b(1): both columns NULL on an ENRICHED row (description extracted, size never asserted) -> no size line, grounding line stays
+ok 94 - C77-b(1): both columns NULL on an ENRICHED row (description extracted, size never asserted) -> no size line, grounding line stays
+  ---
+  duration_ms: 0.19015
+  type: 'test'
+  ...
+# Subtest: C77-c: the unmappable legacy N/A asserts nothing -> no size line
+ok 95 - C77-c: the unmappable legacy N/A asserts nothing -> no size line
+  ---
+  duration_ms: 0.245871
+  type: 'test'
+  ...
+# Subtest: C77-b(2): practice_size_fit_source IS consumed -- the C50 note renders on the abstained cohort through the new line
+ok 96 - C77-b(2): practice_size_fit_source IS consumed -- the C50 note renders on the abstained cohort through the new line
+  ---
+  duration_ms: 0.218421
+  type: 'test'
+  ...
+# Subtest: RENDER: no line of the profile ever carries a token outside the closed vocabulary as a size
+ok 97 - RENDER: no line of the profile ever carries a token outside the closed vocabulary as a size
+  ---
+  duration_ms: 0.467945
+  type: 'test'
+  ...
+# (node:836) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/user/gph-mcp-server/functions/_shared/practice-size-vocab.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/user/gph-mcp-server/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: VOCAB 1: the sentinel block is byte-identical to the pinned cross-repo contract
+ok 98 - VOCAB 1: the sentinel block is byte-identical to the pinned cross-repo contract
+  ---
+  duration_ms: 1.514407
+  type: 'test'
+  ...
+# Subtest: VOCAB 2: the closed set is exactly five tokens, frozen, no duplicates
+ok 99 - VOCAB 2: the closed set is exactly five tokens, frozen, no duplicates
+  ---
+  duration_ms: 0.750676
+  type: 'test'
+  ...
+# Subtest: VOCAB 3: the projection is TOTAL over every observed stored token, on both columns
+ok 100 - VOCAB 3: the projection is TOTAL over every observed stored token, on both columns
+  ---
+  duration_ms: 0.324915
+  type: 'test'
+  ...
+# Subtest: VOCAB 4: exactly one unmappable token, legacy N/A, named with its row count
+ok 101 - VOCAB 4: exactly one unmappable token, legacy N/A, named with its row count
+  ---
+  duration_ms: 0.218021
+  type: 'test'
+  ...
+# Subtest: VOCAB 5: the specific projections C77-c names
+ok 102 - VOCAB 5: the specific projections C77-c names
+  ---
+  duration_ms: 0.291734
+  type: 'test'
+  ...
+# Subtest: VOCAB 6: resolution is enriched-first, then legacy, then nothing -- same rule as the resolver
+ok 103 - VOCAB 6: resolution is enriched-first, then legacy, then nothing -- same rule as the resolver
+  ---
+  duration_ms: 0.208767
+  type: 'test'
+  ...
+# Subtest: VOCAB 7: display labels re-join atoms; nothing is invented for nothing
+ok 104 - VOCAB 7: display labels re-join atoms; nothing is invented for nothing
+  ---
+  duration_ms: 0.373903
+  type: 'test'
+  ...
+# Subtest: VOCAB 8: request-side values callers actually send project onto the closed set
+ok 105 - VOCAB 8: request-side values callers actually send project onto the closed set
+  ---
+  duration_ms: 1.552503
+  type: 'test'
+  ...
+# Subtest: VOCAB 9: storedTokensFor inverts the projection on each column
+ok 106 - VOCAB 9: storedTokensFor inverts the projection on each column
+  ---
+  duration_ms: 0.515645
+  type: 'test'
+  ...
+# Subtest: VOCAB 10: the SQL fragment binds only stored tokens, never caller text, and is closed on empty input
+ok 107 - VOCAB 10: the SQL fragment binds only stored tokens, never caller text, and is closed on empty input
+  ---
+  duration_ms: 0.639008
+  type: 'test'
+  ...
+# (node:837) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/user/gph-mcp-server/functions/mcp.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/user/gph-mcp-server/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: an approved edit wins over enriched, through the MCP resolver too (same block, same precedence)
+ok 108 - an approved edit wins over enriched, through the MCP resolver too (same block, same precedence)
+  ---
+  duration_ms: 1.146904
+  type: 'test'
+  ...
+# Subtest: get_provider_detail renders the vendor-supplied value and label for an approved edit
+ok 109 - get_provider_detail renders the vendor-supplied value and label for an approved edit
+  ---
+  duration_ms: 1.632999
+  type: 'test'
+  ...
+# Subtest: get_provider_detail renders no vendor-supplied label for a plain enriched row
+ok 110 - get_provider_detail renders no vendor-supplied label for a plain enriched row
+  ---
+  duration_ms: 0.974065
+  type: 'test'
+  ...
+# Subtest: get_provider_detail renders no vendor-supplied label for a plain legacy row
+ok 111 - get_provider_detail renders no vendor-supplied label for a plain legacy row
+  ---
+  duration_ms: 0.201313
+  type: 'test'
+  ...
+# Subtest: a pending/rejected edit never reaches this surface -- absent approved_edits resolves to enriched, unaffected
+ok 112 - a pending/rejected edit never reaches this surface -- absent approved_edits resolves to enriched, unaffected
+  ---
+  duration_ms: 0.192763
+  type: 'test'
+  ...
+# Subtest: services_tags and practice_size_fit vendor-edit labels render independently of description
+ok 113 - services_tags and practice_size_fit vendor-edit labels render independently of description
+  ---
+  duration_ms: 0.364537
+  type: 'test'
+  ...
+# (node:856) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/user/gph-mcp-server/functions/mcp.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/user/gph-mcp-server/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: C79-a (match_practice): renders Profile Completeness, never Quality Score
+ok 114 - C79-a (match_practice): renders Profile Completeness, never Quality Score
+  ---
+  duration_ms: 1.386027
+  type: 'test'
+  ...
+# Subtest: C79-a (search_providers): renders Profile Completeness, never Quality
+ok 115 - C79-a (search_providers): renders Profile Completeness, never Quality
+  ---
+  duration_ms: 0.516085
+  type: 'test'
+  ...
+# Subtest: C79-a (get_provider_detail): renders Profile Completeness, never Quality Score
+ok 116 - C79-a (get_provider_detail): renders Profile Completeness, never Quality Score
+  ---
+  duration_ms: 0.526886
+  type: 'test'
+  ...
+# Subtest: C79-b (all three tools): quality_score 0 / null renders "not yet scored", never 0/100
+ok 117 - C79-b (all three tools): quality_score 0 / null renders "not yet scored", never 0/100
+  ---
+  duration_ms: 0.728407
+  type: 'test'
+  ...
+# Subtest: C553 s.1: the legacy verified flag no longer prints a badge on the score line (supersedes the C79-d carve-out)
+ok 118 - C553 s.1: the legacy verified flag no longer prints a badge on the score line (supersedes the C79-d carve-out)
+  ---
+  duration_ms: 0.347464
+  type: 'test'
+  ...
+# Subtest: C79-a (tool descriptions): "quality-scored" -> "completeness-scored"; quality_score annotated as completeness
+ok 119 - C79-a (tool descriptions): "quality-scored" -> "completeness-scored"; quality_score annotated as completeness
+  ---
+  duration_ms: 0.6323
+  type: 'test'
+  ...
+# Subtest: C79-a (glama snapshot + README): the published copies carry the same correction
+ok 120 - C79-a (glama snapshot + README): the published copies carry the same correction
+  ---
+  duration_ms: 0.451711
+  type: 'test'
+  ...
+# Subtest: sizing: the corpus is 3,010 pages / 3,011 calls; the valve admits it in ~25 minutes; the backstop has headroom
+ok 121 - sizing: the corpus is 3,010 pages / 3,011 calls; the valve admits it in ~25 minutes; the backstop has headroom
+  ---
+  duration_ms: 1.046909
+  type: 'test'
+  ...
+# Subtest: full corpus: ONE IP at exactly the permitted rate (120 per 60 s) walks every page of every category and is never refused
+ok 122 - full corpus: ONE IP at exactly the permitted rate (120 per 60 s) walks every page of every category and is never refused
+  ---
+  duration_ms: 1325.615117
+  type: 'test'
+  ...
+# Subtest: full corpus: the same walk survives isolate recycling every 37 calls (local state lost) without refusal
+ok 123 - full corpus: the same walk survives isolate recycling every 37 calls (local state lost) without refusal
+  ---
+  duration_ms: 898.323276
+  type: 'test'
+  ...
+# Subtest: burst: 100 calls/s from one IP is refused after the window allowance, with retry-after, and recovers after it
+ok 124 - burst: 100 calls/s from one IP is refused after the window allowance, with retry-after, and recovers after it
+  ---
+  duration_ms: 35.8519
+  type: 'test'
+  ...
+# Subtest: burst: the valve is per IP -- a flood from one IP does not refuse another IP
+ok 125 - burst: the valve is per IP -- a flood from one IP does not refuse another IP
+  ---
+  duration_ms: 28.820537
+  type: 'test'
+  ...
+# Subtest: burst: the refusal holds across isolate recycling once KV has recorded the window (KV read path)
+ok 126 - burst: the refusal holds across isolate recycling once KV has recorded the window (KV read path)
+  ---
+  duration_ms: 21.069357
+  type: 'test'
+  ...
+# Subtest: daily backstop: refuses at DAILY_BACKSTOP with retry-after to 00:00 UTC
+ok 127 - daily backstop: refuses at DAILY_BACKSTOP with retry-after to 00:00 UTC
+  ---
+  duration_ms: 1.246902
+  type: 'test'
+  ...
+# Subtest: fail open: a CALL_METER that throws on read and write never refuses a call
+ok 128 - fail open: a CALL_METER that throws on read and write never refuses a call
+  ---
+  duration_ms: 15.149249
+  type: 'test'
+  ...
+# Subtest: legacy keys: an exhausted plan key falls through to the anonymous valve instead of a hard refusal
+ok 129 - legacy keys: an exhausted plan key falls through to the anonymous valve instead of a hard refusal
+  ---
+  duration_ms: 1.152835
+  type: 'test'
+  ...
+# Subtest: no refusal text, code path, runbook or README points to licensing
+ok 130 - no refusal text, code path, runbook or README points to licensing
+  ---
+  duration_ms: 19.803406
+  type: 'test'
+  ...
+# Subtest: valve keys are per IP only: no ASN, organisation or category in any meter key
+ok 131 - valve keys are per IP only: no ASN, organisation or category in any meter key
+  ---
+  duration_ms: 1.015251
+  type: 'test'
+  ...
+# (node:863) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///home/user/gph-mcp-server/functions/mcp.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /home/user/gph-mcp-server/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: cache: first read is a miss and stores; identical read is a hit with no upstream call
+ok 132 - cache: first read is a miss and stores; identical read is a hit with no upstream call
+  ---
+  duration_ms: 23.865262
+  type: 'test'
+  ...
+# Subtest: cache key: normalizes exactly what /api/search normalizes, and nothing it does not
+ok 133 - cache key: normalizes exactly what /api/search normalizes, and nothing it does not
+  ---
+  duration_ms: 0.991444
+  type: 'test'
+  ...
+# Subtest: cache key soundness (fuzz): equal cache key implies an identical production /api/search query
+ok 134 - cache key soundness (fuzz): equal cache key implies an identical production /api/search query
+  ---
+  duration_ms: 249.163055
+  type: 'test'
+  ...
+# Subtest: cache poisoning regression (G78-41): page "0x10" is upstream page 16 and never fills or reads the page-1 entry
+ok 135 - cache poisoning regression (G78-41): page "0x10" is upstream page 16 and never fills or reads the page-1 entry
+  ---
+  duration_ms: 2.100084
+  type: 'test'
+  ...
+# Subtest: cache TTL: an entry is served up to the bound and refetched at and after it
+ok 136 - cache TTL: an entry is served up to the bound and refetched at and after it
+  ---
+  duration_ms: 2.145752
+  type: 'test'
+  ...
+# Subtest: cache: no stale serve after the bound -- a data change upstream is visible once the TTL passes
+ok 137 - cache: no stale serve after the bound -- a data change upstream is visible once the TTL passes
+  ---
+  duration_ms: 1.652609
+  type: 'test'
+  ...
+# Subtest: cache: entries with a missing, garbage or future timestamp are misses
+ok 138 - cache: entries with a missing, garbage or future timestamp are misses
+  ---
+  duration_ms: 1.505041
+  type: 'test'
+  ...
+# Subtest: cache: failures are never stored; a throwing store serves uncached (bypass), never refuses
+ok 139 - cache: failures are never stored; a throwing store serves uncached (bypass), never refuses
+  ---
+  duration_ms: 0.767578
+  type: 'test'
+  ...
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# Subtest: cache via tools/call: a hit renders identically, still meters, still writes one telemetry row marked hit
+ok 140 - cache via tools/call: a hit renders identically, still meters, still writes one telemetry row marked hit
+  ---
+  duration_ms: 12.93693
+  type: 'test'
+  ...
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# Subtest: cache is search_providers-only: other tools get cache_status NULL
+ok 141 - cache is search_providers-only: other tools get cache_status NULL
+  ---
+  duration_ms: 14.851953
+  type: 'test'
+  ...
+# Subtest: descriptions: get_provider_detail promises only what the rendered profile contains
+ok 142 - descriptions: get_provider_detail promises only what the rendered profile contains
+  ---
+  duration_ms: 0.751644
+  type: 'test'
+  ...
+# Subtest: descriptions: city no longer claims partial matching; it names exact slug matching
+ok 143 - descriptions: city no longer claims partial matching; it names exact slug matching
+  ---
+  duration_ms: 0.294397
+  type: 'test'
+  ...
+# Subtest: descriptions: the glama snapshot carries the same two corrections
+ok 144 - descriptions: the glama snapshot carries the same two corrections
+  ---
+  duration_ms: 0.258432
+  type: 'test'
+  ...
+# Subtest: tools/list: page stays uncapped, count stays declared, per_page ceiling unchanged
+ok 145 - tools/list: page stays uncapped, count stays declared, per_page ceiling unchanged
+  ---
+  duration_ms: 0.074821
+  type: 'test'
+  ...
+# Subtest: rate-control purpose: the code comment and RUNBOOK.md carry the same text
+ok 146 - rate-control purpose: the code comment and RUNBOOK.md carry the same text
+  ---
+  duration_ms: 0.414643
+  type: 'test'
+  ...
+# Subtest: rate controls: no ASN, organisation or category keyed limiter was introduced
+ok 147 - rate controls: no ASN, organisation or category keyed limiter was introduced
+  ---
+  duration_ms: 0.86705
+  type: 'test'
+  ...
+# Subtest: traffic_class: each call shape classifies per the rule
+ok 148 - traffic_class: each call shape classifies per the rule
+  ---
+  duration_ms: 0.183752
+  type: 'test'
+  ...
+# Subtest: traffic_class: written on the D1 row at write time; demand_cell and results_count unchanged
+ok 149 - traffic_class: written on the D1 row at write time; demand_cell and results_count unchanged
+  ---
+  duration_ms: 3.690972
+  type: 'test'
+  ...
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# Subtest: D1 writer: with the migration applied, the row carries traffic_class and cache_status
+ok 150 - D1 writer: with the migration applied, the row carries traffic_class and cache_status
+  ---
+  duration_ms: 1.423671
+  type: 'test'
+  ...
+# Subtest: D1 writer: deployed BEFORE the migration, the call record is still written (pre-M1 columns)
+ok 151 - D1 writer: deployed BEFORE the migration, the call record is still written (pre-M1 columns)
+  ---
+  duration_ms: 1.960655
+  type: 'test'
+  ...
+# Subtest: migration: additive only (ADD COLUMN), both columns, marked not applied
+ok 152 - migration: additive only (ADD COLUMN), both columns, marked not applied
+  ---
+  duration_ms: 0.318313
+  type: 'test'
+  ...
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# logToolCall: AIRTABLE_PAT not bound -- telemetry write skipped
+# Subtest: enumeration: a full 142-page category walk completes with no refusal and count on every page
+ok 153 - enumeration: a full 142-page category walk completes with no refusal and count on every page
+  ---
+  duration_ms: 172.618588
+  type: 'test'
+  ...
+# Subtest: C553: get_provider_detail prints the API's labelled facts and last-checked date, and never a verified badge
+ok 154 - C553: get_provider_detail prints the API's labelled facts and last-checked date, and never a verified badge
+  ---
+  duration_ms: 0.335937
+  type: 'test'
+  ...
+# Subtest: C553: an API body without fact_provenance (fenced vendor, or an older API) adds no Provenance section and invents nothing
+ok 155 - C553: an API body without fact_provenance (fenced vendor, or an older API) adds no Provenance section and invents nothing
+  ---
+  duration_ms: 0.178739
+  type: 'test'
+  ...
+# Subtest: C553: a malformed fact_provenance renders nothing rather than guessing
+ok 156 - C553: a malformed fact_provenance renders nothing rather than guessing
+  ---
+  duration_ms: 0.741674
+  type: 'test'
+  ...
+# Subtest: C553: match_practice and search_providers results no longer print the legacy verified badge
+ok 157 - C553: match_practice and search_providers results no longer print the legacy verified badge
+  ---
+  duration_ms: 0.742657
+  type: 'test'
+  ...
+# Subtest: C812: internal caller_class reaches D1 (M1 columns: true)
+ok 158 - C812: internal caller_class reaches D1 (M1 columns: true)
+  ---
+  duration_ms: 3.411763
+  type: 'test'
+  ...
+# Subtest: C812: internal caller_class reaches D1 (M1 columns: false)
+ok 159 - C812: internal caller_class reaches D1 (M1 columns: false)
+  ---
+  duration_ms: 1.915828
+  type: 'test'
+  ...
+1..159
+# tests 159
+# suites 0
+# pass 159
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2734.355428
