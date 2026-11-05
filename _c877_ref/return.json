@@ -1,0 +1,49 @@
+{
+ "program_id": "GPH-PRACTICE-DATA-01--COUNTS-DEFINITION",
+ "stage_id": "C1490-COUNTS-DEFINITION-VERIFY",
+ "allocation_id": "ALLOC-REFILL-GPH-PRACTICE-DATA-01--COUNTS-DEFINITION-C1490-COUNTS-DEFINITION-VERIFY-433b7f1a",
+ "worker_id": "WKR-REFILL-GPH-PRACTICE-DATA-01--COUNTS-DEFINITION-C1490-COUNTS-DEFINITION-VERIFY-7c927585",
+ "result": "VERIFY_PASS",
+ "head": "945af896181024ca034b4c1ae2f340e3b189d5ad",
+ "model_used": "claude-sonnet-5-5",
+ "property": "C1490 description-only change to practice_data_counts at head, against current origin/main: scope, description text, listing agreement and tests verified",
+ "summary": "VERIFY_PASS. Scope is exactly the four files. The JS diff is one description line; URL, params, schema, timeout, redirect and response handling are unchanged. Description states headline (strongest-tier) evidence only, by state and segment, cells under 25 not published (null), lower-evidence excluded, lower than product all-record totals, no records or names. tools.json matches TOOLS byte for byte; README carries the same sentences condensed; mcp.json names only, no change. Tests 159/159 pass; mutant removing lower-evidence fails 1 test and was reverted. Note: the description also cites 507,423 as the published product total, a figure taken from the ruling that cannot be checked offline.",
+ "boundary": "Read only git verification of head against origin/main; no network, deploy, merge or write beyond _c877_ref.",
+ "blocker": "",
+ "material_exception": false,
+ "findings": [
+  "Description includes the 507,423 product-page total, beyond the brief's five listed claims; sourced from the ruling, unverifiable offline, hedged as published there.",
+  "README text is a condensed version of the TOOLS description (omits the filter sentence), not byte-identical."
+ ],
+ "changed_paths": [
+  "_c877_ref/return.json",
+  "_c877_ref/verify-evidence.txt"
+ ],
+ "verified_blobs": {
+  "README.md": "435032028a87f9cb64f910d925a38f98061ceadd",
+  "functions/_shared/practice-data-counts.js": "524ad671d03e9f8ec8e80999fc9640106462f54f",
+  "glama-release/tools.json": "adbe3e577b4dad13c2a8b9dc91752b65a5bfd15e",
+  "tests/practice-data-counts.test.mjs": "ad520af083de3ac894378294d35c7d4839fd6fd3"
+ },
+ "verified_deletions": [],
+ "workspace": "removed",
+ "independence_attestation": {
+  "fresh_seat": true,
+  "read_from": [
+   "_c877_ref/BRIEF.md",
+   "_c877_ref/ENVELOPE-SCHEMA.md",
+   "origin/main",
+   "head 945af89 diff and tree"
+  ],
+  "never_had_access_to": [
+   "the builder lane",
+   "the controller session"
+  ]
+ },
+ "evidence": [
+  {
+   "path": "_c877_ref/verify-evidence.txt",
+   "sha256": "94878caa0d5484fcf5f19e600126077dd33a0bbad6e9363ddd0be6aca721be82"
+  }
+ ]
+}

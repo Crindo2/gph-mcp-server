@@ -1,0 +1,10 @@
+C1490 verify evidence
+head: 945af896181024ca034b4c1ae2f340e3b189d5ad
+scope: README.md, functions/_shared/practice-data-counts.js, glama-release/tools.json, tests/practice-data-counts.test.mjs
+js diff: single description line only; fetch URL, query params, input schema, timeout, redirect and response handling untouched
+description quoted: Counts practices with headline (strongest-tier) evidence only, by US state and practice segment, from the public Practice Data aggregate endpoint (unit: practices (headline evidence)). It excludes lower-evidence records, so these numbers are lower than the all-record totals on the Practice Data product pages (507,423 nationally as published there). Cells with fewer than 25 practices are not published (returned with count null and suppressed true). Aggregate counts only: no records or names are returned. Optional state and segment filters narrow the result; the JSON body is returned unchanged.
+tools.json description byte-equal to TOOLS entry; README carries the same sentences (condensed, without the filter sentence)
+mcp.json lists name only (line 26), unchanged
+tests: 159 total, 159 pass, 0 fail
+mutant (lower-evidence removed): 158 pass, 1 fail (description says exactly what is counted (C1490)); reverted
+note: 507,423 is an extra numeric claim sourced from the ruling, unverifiable offline
