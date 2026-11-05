@@ -115,3 +115,10 @@ test('mcp.json, glama-release/tools.json and TOOLS name the same six tools', asy
   assert.equal(gl.description, lc.description);
   assert.equal(gl.title, lc.title);
 });
+test('description says exactly what is counted (C1490)', () => {
+  const spec = TOOLS.find(t => t.name === 'practice_data_counts');
+  assert.ok(spec.description.includes('headline'));
+  assert.ok(spec.description.includes('lower-evidence'));
+  assert.ok(spec.description.includes('507,423'));
+  assert.ok(spec.description.includes('fewer than 25'));
+});
