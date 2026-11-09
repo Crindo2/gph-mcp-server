@@ -1,0 +1,70 @@
+{
+  "program_id": "GPH-MCP-SERVING-01",
+  "stage_id": "C1569-MCP-COUNT-AND-SOURCE",
+  "allocation_id": "ALLOC-C1569-MCP-G136-01",
+  "worker_id": "WKR-C1569-MCP-G136-01",
+  "result": "NEEDS_VERIFY",
+  "head": "7d2648cb89b1ba957bc3528d6953372f6928f02a",
+  "changed_paths": [
+    "functions/_shared/attribution.js",
+    "functions/_shared/practice-data-counts.js",
+    "functions/mcp.js",
+    "tests/ehr-product-detail.test.mjs",
+    "tests/practice-data-counts.test.mjs",
+    "tests/serving-m1.test.mjs"
+  ],
+  "verified_blobs": {
+    "functions/_shared/attribution.js": "d4b8e196f70a7dc43de276004099de5e10f36607",
+    "functions/_shared/practice-data-counts.js": "c674f41cd31976d9b56a602e22fa6bbc5eb5c6db",
+    "functions/mcp.js": "49655c408df1664fa716c332392760a9d9f167e9",
+    "tests/ehr-product-detail.test.mjs": "94042c643450dea712b2329f2d890dcb1fef735e",
+    "tests/practice-data-counts.test.mjs": "b2565e38dc1a194c9af8f31b73acda6802c9c9e4",
+    "tests/serving-m1.test.mjs": "1a585585b8808072ea03e11f6d6587fdde86c8cf"
+  },
+  "evidence": [
+    {
+      "path": "functions/_shared/attribution.js",
+      "blob": "d4b8e196f70a7dc43de276004099de5e10f36607"
+    },
+    {
+      "path": "functions/_shared/practice-data-counts.js",
+      "blob": "c674f41cd31976d9b56a602e22fa6bbc5eb5c6db"
+    },
+    {
+      "path": "functions/mcp.js",
+      "blob": "49655c408df1664fa716c332392760a9d9f167e9"
+    },
+    {
+      "path": "tests/ehr-product-detail.test.mjs",
+      "blob": "94042c643450dea712b2329f2d890dcb1fef735e"
+    },
+    {
+      "path": "tests/practice-data-counts.test.mjs",
+      "blob": "b2565e38dc1a194c9af8f31b73acda6802c9c9e4"
+    },
+    {
+      "path": "tests/serving-m1.test.mjs",
+      "blob": "1a585585b8808072ea03e11f6d6587fdde86c8cf"
+    }
+  ],
+  "summary": "Item 2: practiceDataCounts() now returns count = number of published, non-suppressed cells; telemetry stores it and zero_result is 1 only when that is 0. Item 5: new functions/_shared/attribution.js; every successful tool response gains top-level source and url (utm_source=mcp, utm_medium=ai-assistant, utm_campaign=<tool>) plus one trailing text block; content[0] and the counts body are unchanged. Errors carry no citation. URLs: practice_data_counts -> /data/ (hub; not verified live, only /data/api/counts is known to the code), get_provider_detail -> /providers/<slug>/, match_practice -> /match/, other directory tools and get_ehr_product_detail -> /providers/. Three existing tests that pinned the old result key set or exact EHR result were updated to allow source/url. Item 3: no client, schedule or workflow in this repo calls match_practice, list_categories, practice_data_counts x3. Only workflows are gates.yml (PR) and deploy.yml (push to main); neither calls the MCP. The caller is NOT identifiable from this repo; production UA python-requests/2.x classifies as known_crawler/bot. The repo's internal marking is a User-Agent starting with cbeg- (classifyCaller and callerIdentity in functions/mcp.js, also verify-fix-organic and the Codex UA); if the script is ours, set its UA to e.g. cbeg-smoke/1 and it logs caller_class internal, caller_kind self_test. No code change made for it since the script is not in this repo. Item 4: not computed (no production data access). Deploy route: merge to main triggers .github/workflows/deploy.yml (node --test gate, wrangler pages deploy to Cloudflare Pages project gph-mcp-server, then reads back deployed commit_hash and fails if it differs from GITHUB_SHA). PRs need required check gates.",
+  "tests": {
+    "suite": "node --test tests/*.test.mjs",
+    "before": "159 pass 0 fail",
+    "after": "166 pass 0 fail",
+    "new_tests": 7,
+    "mutations": {
+      "drop count": "killed (2 fail)",
+      "count suppressed cells": "killed after adding suppressed-with-number test (1 fail)",
+      "zero_result inverted": "killed (1 fail)",
+      "zero_result never set": "killed (1 fail)",
+      "remove utm_medium": "killed (2 fail)"
+    }
+  },
+  "boundary": "No merge, deploy, workflow dispatch, production write or PR. Brief branch untouched. No force-push.",
+  "blocker": "",
+  "material_exception": false,
+  "model_used": "claude-sonnet-5-5",
+  "property": "GPH",
+  "return_branch": "claude/c1569-mcp-count-source"
+}
