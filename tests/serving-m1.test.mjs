@@ -325,7 +325,7 @@ test('cache via tools/call: a hit renders identically, still meters, still write
     const second = await mcpCall(env, req, 'search_providers', { category: LAB, per_page: 25, page: 7 });
     assert.deepEqual(second, first, 'identical tool result');
     assert.equal(second.count, 3536, 'count stays visible');
-    assert.deepEqual(Object.keys(second).sort(), ['content', 'count', 'ids'], 'no new field in the result');
+    assert.deepEqual(Object.keys(second).sort(), ['content', 'count', 'ids', 'source', 'url'], 'only the C1569 citation fields are added to the result');
     assert.equal(up.calls.length, 1);
     const rows = env.TELEMETRY_DB.rows;
     assert.equal(rows.length, 2, 'every call is recorded');
@@ -611,7 +611,7 @@ for (const hasM1Columns of [true, false]) {
         const out = await mcpCall(env, request, 'search_providers', { category: LAB, state: 'TX' });
         assert.equal(out.isError, undefined);
         assert.equal(out.count, 3536);
-        assert.deepEqual(Object.keys(out).sort(), ['content', 'count', 'ids']);
+        assert.deepEqual(Object.keys(out).sort(), ['content', 'count', 'ids', 'source', 'url']);
       }
     }));
     assert.equal(env.TELEMETRY_DB.rows.length, 3);

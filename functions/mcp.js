@@ -21,6 +21,7 @@ import {
 } from './_shared/match-vocab.js';
 
 import { EHR_PRODUCT_TOOL, ehrProductDetail, validateEhrProductArgs } from './_shared/ehr-product-detail.js';
+import { withAttribution } from './_shared/attribution.js';
 import { PRACTICE_DATA_COUNTS_TOOL, practiceDataCounts, validatePracticeDataCountsArgs } from './_shared/practice-data-counts.js';
 
 const API_BASE = 'https://www.getpracticehelp.com/api';
@@ -675,6 +676,10 @@ function matchNeedsSummary(summary) {
 }
 
 export async function callTool(name, args) {
+  return withAttribution(name, args, await callToolRaw(name, args));
+}
+
+async function callToolRaw(name, args) {
   if (name === EHR_PRODUCT_TOOL.name) return ehrProductDetail(args);
   if (name === PRACTICE_DATA_COUNTS_TOOL.name) return practiceDataCounts(args);
   if (name === 'list_categories') {
@@ -986,7 +991,7 @@ export async function serveTool(name, args, { env = null, now = Date.now(), wait
   if (name === 'search_providers') {
     const cache = await openSearchCache(env);
     const { data, cacheStatus } = await fetchSearchData(args, { cache, now, waitUntil });
-    return { result: renderSearchResult(args, data), cacheStatus };
+    return { result: withAttribution(name, args, renderSearchResult(args, data)), cacheStatus };
   }
   return { result: await callTool(name, args), cacheStatus: null };
 }

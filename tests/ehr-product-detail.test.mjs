@@ -36,7 +36,8 @@ test('all existing definitions remain byte-identical and runtime-identical', () 
 test('HTTP/MCP parity via served path, GET only, no credentials, bounded timeout', async () => {
   const calls = mock();
   const {result, cacheStatus} = await serveTool('get_ehr_product_detail', {product_key:'nextgen-healthcare'});
-  assert.deepEqual(result, {content:[{type:'text',text:JSON.stringify(fixture)}]});
+  assert.deepEqual(result.content[0], {type:'text',text:JSON.stringify(fixture)});
+  assert.equal(result.source, 'GetPracticeHelp');
   assert.deepEqual(body(result), fixture);
   assert.equal(cacheStatus, null);
   assert.equal(calls.length, 1);
