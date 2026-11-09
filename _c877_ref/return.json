@@ -1,0 +1,91 @@
+{
+  "program_id": "GPH-MCP-SERVING-01",
+  "stage_id": "WKR-C1569-MCP-CV",
+  "allocation_id": "ALLOC-C1569-MCP-CV-G136-01",
+  "worker_id": "WKR-C1569-MCP-CV-G136-01",
+  "result": "VERIFY_PASS",
+  "summary": "Suite at head: 166 tests, 166 pass, 0 fail (node --test). Item 2 true: count = published non-suppressed cells (publishedCellCount), zero_result is 1 only when count 0 (practice_data_counts is funnel step discover, so the rule applies; errors carry no count so zero_result stays 0). Item 5 true: callTool and the search_providers served path wrap results in withAttribution; success gains source, url (utm_source=mcp, utm_medium=ai-assistant, utm_campaign=<tool>) and one trailing text block; errors (isError) and validation rejections are untouched; content[0] is preserved by construction. Caveats, none blocking: (a) the counts body is asserted by JSON parse deepEqual, not bytes; mutant M6 (trailing space appended to content[0].text) was caught only by the EHR exact-text test, not by a practice_data_counts test; (b) responses also gain a trailing content block and, for practice_data_counts, a top-level count, so 'nothing else changes' is true only in the additive sense; outputSchemas do not declare source/url (no additionalProperties:false found); (c) /data/ hub URL is unverified live, as the builder disclosed; (d) deploy.yml also has workflow_dispatch, which the builder's summary omits; both workflows are unchanged by this diff, use minimal permissions (contents: read), pass the Cloudflare secret by env name only with a fail-loud precondition, and interpolate no workflow input into run:. Item 3 judgment: python-requests/2.x classifies known_crawler/bot at mcp.js lines 1299-1301 and 1377; internal needs a UA starting cbeg- (line 1286, 1408 self_test); no caller of match_practice, list_categories or practice_data_counts exists in this repo (grep of yml/json/sh found only tool definitions in mcp.json and fixtures); judging it correct that no code change was made, the fix is a UA change in the external script. Item 4 not computed, accepted. No merge, deploy, dispatch, live call or PR.",
+  "property": "CBEG",
+  "model_used": "claude-sonnet-5-5",
+  "boundary": "Read only on the subject. No merge, deploy, workflow dispatch, live endpoint call, PR, add_repo or approval-gated tool. Brief branch untouched. Mutations were applied to the working tree only and reverted (git status clean); only this envelope file is committed, on the new verify branch.",
+  "blocker": null,
+  "material_exception": false,
+  "head": "7d2648cb89b1ba957bc3528d6953372f6928f02a",
+  "verified_blobs": {
+    "functions/_shared/attribution.js": "d4b8e196f70a7dc43de276004099de5e10f36607",
+    "functions/_shared/practice-data-counts.js": "c674f41cd31976d9b56a602e22fa6bbc5eb5c6db",
+    "functions/mcp.js": "49655c408df1664fa716c332392760a9d9f167e9",
+    "tests/ehr-product-detail.test.mjs": "94042c643450dea712b2329f2d890dcb1fef735e",
+    "tests/practice-data-counts.test.mjs": "b2565e38dc1a194c9af8f31b73acda6802c9c9e4",
+    "tests/serving-m1.test.mjs": "1a585585b8808072ea03e11f6d6587fdde86c8cf"
+  },
+  "verified_deletions": [],
+  "evidence": [
+    {
+      "path": "functions/_shared/attribution.js",
+      "sha256": "fede01df31047bfc101b0b47483034a5859567c5208408aab5df583a84516b12"
+    },
+    {
+      "path": "functions/_shared/practice-data-counts.js",
+      "sha256": "e55f6d4e96f10ff3bface46a2b6719bcaf73565dedbef547e8559e3e6a57c3db"
+    },
+    {
+      "path": "functions/mcp.js",
+      "sha256": "be62c5d76c1d4a3afde3cdab0ca541d4045e26cda8ef54e2fb852e7ad8dc080d"
+    },
+    {
+      "path": "tests/ehr-product-detail.test.mjs",
+      "sha256": "bc4efdec6ec6c7f8dbea54042904c8737f41093f60ee7c24de089629edb7752c"
+    },
+    {
+      "path": "tests/practice-data-counts.test.mjs",
+      "sha256": "f73dc1d62044d6b2b6304d122e37374feb002fbd695a2edc2e9e38178a62e12a"
+    },
+    {
+      "path": "tests/serving-m1.test.mjs",
+      "sha256": "302f3cae08fdd08ffcaffd8ae1cd9642c939e1c232428c51cbee85468a20a84e"
+    }
+  ],
+  "independence_attestation": {
+    "fresh_seat": true,
+    "read_from": [
+      "origin/brief/alloc-c1569-mcp-cv-g136-01:BRIEF.md",
+      "Crindo2/gph-mcp-server at 7d2648cb89b1ba957bc3528d6953372f6928f02a and origin/main (diff)",
+      "build envelope _c877_ref/return.json read only after own findings were formed"
+    ],
+    "never_had_access_to": [
+      "any credential value"
+    ]
+  },
+  "mutants": [
+    {
+      "mutant": "M1 count includes suppressed cells (drop suppressed check)",
+      "caught_by": "C1569: a suppressed cell is never counted, even if it carried a number"
+    },
+    {
+      "mutant": "M2 count = number of states instead of cells",
+      "caught_by": "C1569: all cells suppressed or none returned gives count 0; telemetry zero_result is 1"
+    },
+    {
+      "mutant": "M3 zero_result flip (rc === 0 -> rc <= 1) in buildTelemetry",
+      "caught_by": "C1569: all cells suppressed or none returned gives count 0; telemetry zero_result is 1"
+    },
+    {
+      "mutant": "M4 attribution applied to error results (drop isError guard)",
+      "caught_by": "C1569: errors carry no count and no citation; invalid identities and aliases never fetch; validation matches execution"
+    },
+    {
+      "mutant": "M5 utm_medium changed to chat",
+      "caught_by": "C1569: practice_data_counts carries source and a UTM-tagged url; C1569: directory tools carry source GetPracticeHelp and a matching tagged url"
+    },
+    {
+      "mutant": "M6 content[0].text altered (trailing space)",
+      "caught_by": "HTTP/MCP parity via served path (ehr-product-detail); NOT caught by any practice_data_counts test (weak spot: JSON-parse comparison)"
+    },
+    {
+      "mutant": "M7 count not returned from practiceDataCounts",
+      "caught_by": "C1569: count is the number of published, non-suppressed cells; body unchanged; C1569: all cells suppressed...; C1569: a suppressed cell is never counted"
+    }
+  ],
+  "return_branch": "verify/alloc-c1569-mcp-cv-g136-01"
+}
