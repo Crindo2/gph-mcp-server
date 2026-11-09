@@ -1,5 +1,5 @@
 You are a BUILDER for CBEG ops.
-- Allocation ALLOC-C1569-MCP-G136-01; program C1552-S3-DATA-APP-DEEPLINK; stage C1569-MCP-COUNT-AND-SOURCE; worker WKR-C1569-MCP-G136-01.
+- Allocation ALLOC-C1569-MCP-G136-01; program GPH-MCP-SERVING-01; stage C1569-MCP-COUNT-AND-SOURCE; worker WKR-C1569-MCP-G136-01.
 - Tier: Sonnet.
 
 ## Limits
@@ -40,7 +40,7 @@ You are a BUILDER for CBEG ops.
 ## Envelope (strict)
 - Push to `claude/c1569-mcp-count-source`.
 - Write `_c877_ref/return.json` on a NEW branch `build/alloc-c1569-mcp-g136-01` with:
-  - `"program_id": "C1552-S3-DATA-APP-DEEPLINK"`
+  - `"program_id": "GPH-MCP-SERVING-01"`
   - `"stage_id": "C1569-MCP-COUNT-AND-SOURCE"`
   - `"allocation_id": "ALLOC-C1569-MCP-G136-01"`
   - `"worker_id": "WKR-C1569-MCP-G136-01"`
