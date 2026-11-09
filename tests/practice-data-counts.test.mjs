@@ -122,3 +122,64 @@ test('description says exactly what is counted (C1490)', () => {
   assert.ok(spec.description.includes('507,423'));
   assert.ok(spec.description.includes('fewer than 25'));
 });
+// C1569 s.1: telemetry reads result.count; it must be the number of published, non-suppressed cells.
+test('C1569: count is the number of published, non-suppressed cells; body unchanged', async () => {
+  mock();
+  const r = await invoke({ state: 'TX' });
+  assert.strictEqual(r.count, 1);
+  assert.deepEqual(body(r), fixture);
+});
+test('C1569: all cells suppressed or none returned gives count 0; telemetry zero_result is 1', async () => {
+  const { buildTelemetry } = await import('../functions/mcp.js');
+  const req = new Request('https://x/mcp', { headers: { 'user-agent': 'x' } });
+  mock({ ...fixture, states: [{ state: 'TX', segments: [fixture.states[0].segments[1]] }] });
+  let r = await invoke({});
+  assert.strictEqual(r.count, 0);
+  assert.equal((await buildTelemetry('gph', req, {}, 'practice_data_counts', {}, r.count, 'anonymous', r.ids)).zero_result, 1);
+  mock({ ...fixture, states: [] });
+  assert.strictEqual((await invoke({})).count, 0);
+  mock();
+  r = await invoke({});
+  const t = await buildTelemetry('gph', req, {}, 'practice_data_counts', {}, r.count, 'anonymous', r.ids);
+  assert.equal(t.results_count, 1);
+  assert.equal(t.zero_result, 0);
+});
+test('C1569: errors carry no count and no citation', async () => {
+  globalThis.fetch = async () => new Response('{}', { status: 500 });
+  const r = await invoke({});
+  assert.equal(r.isError, true);
+  assert.equal(Object.hasOwn(r, 'count'), false);
+  assert.equal(Object.hasOwn(r, 'source'), false);
+});
+// C1569 s.5: citation on every tool response.
+test('C1569: practice_data_counts carries source and a UTM-tagged url; counts body untouched', async () => {
+  mock();
+  const r = await invoke({});
+  assert.equal(r.source, 'GetPracticeHelp Practice Data');
+  assert.equal(r.url, 'https://www.getpracticehelp.com/data/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=practice_data_counts');
+  assert.deepEqual(JSON.parse(r.content[0].text), fixture);
+  assert.equal(r.content.length, 2);
+  assert.ok(r.content[1].text.includes(r.url));
+});
+test('C1569: directory tools carry source GetPracticeHelp and a matching tagged url', async () => {
+  const { attributionFor } = await import('../functions/_shared/attribution.js');
+  const q = n => `utm_source=mcp&utm_medium=ai-assistant&utm_campaign=${n}`;
+  for (const [n, a, path] of [['list_categories', {}, '/providers/'], ['search_providers', { category: 'X' }, '/providers/'],
+    ['match_practice', {}, '/match/'], ['get_provider_detail', { slug: 'acme-labs-austin-tx' }, '/providers/acme-labs-austin-tx/'],
+    ['get_provider_detail', { slug: '../x' }, '/providers/'], ['get_ehr_product_detail', {}, '/providers/']]) {
+    const r = attributionFor(n, a);
+    assert.equal(r.source, 'GetPracticeHelp');
+    assert.equal(r.url, `https://www.getpracticehelp.com${path}?${q(n)}`);
+  }
+});
+test('C1569: list_categories result gains source and url through callTool', async () => {
+  globalThis.fetch = async () => Response.json({ success: true, total_providers: 3, categories: [{ category: 'A', providers: 3 }] });
+  const r = await callTool('list_categories', {});
+  assert.equal(r.source, 'GetPracticeHelp');
+  assert.ok(r.url.endsWith('utm_campaign=list_categories'));
+  assert.equal(r.count, 1);
+});
+test('C1569: a suppressed cell is never counted, even if it carried a number', async () => {
+  mock({ ...fixture, states: [{ state: 'TX', segments: [{ ...fixture.states[0].segments[0], suppressed: true }, fixture.states[0].segments[0]] }] });
+  assert.strictEqual((await invoke({})).count, 1);
+});

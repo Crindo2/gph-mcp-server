@@ -15,7 +15,17 @@ export const PRACTICE_DATA_COUNTS_TOOL = {
   },
 };
 
-const frame = (body, isError = false) => ({ content: [{ type: 'text', text: JSON.stringify(body) }], ...(isError ? { isError: true } : {}) });
+const frame = (body, isError = false, count) => ({ content: [{ type: 'text', text: JSON.stringify(body) }], ...(isError ? { isError: true } : {}), ...(count === undefined ? {} : { count }) });
+// C1569 s.1: telemetry reads result.count. Report the published, non-suppressed cells returned.
+export function publishedCellCount(body) {
+  let n = 0;
+  for (const st of Array.isArray(body && body.states) ? body.states : []) {
+    for (const c of Array.isArray(st && st.segments) ? st.segments : []) {
+      if (c && c.suppressed !== true && typeof c.count === 'number') n += 1;
+    }
+  }
+  return n;
+}
 export function validatePracticeDataCountsArgs(args) {
   const a = args === undefined || args === null ? {} : args;
   if (typeof a !== 'object' || Array.isArray(a) ||
@@ -40,7 +50,8 @@ export async function practiceDataCounts(args) {
       method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(10000),
     });
     if (response.status !== 200) return frame({ error: 'practice_data_counts_upstream_error', status: response.status }, true);
-    return frame(await response.json());
+    const body = await response.json();
+    return frame(body, false, publishedCellCount(body));
   } catch {
     return frame({ error: 'practice_data_counts_upstream_unavailable' }, true);
   }
