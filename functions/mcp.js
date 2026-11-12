@@ -675,6 +675,15 @@ function matchNeedsSummary(summary) {
   return `Service-need coverage across the API shortlist (up to 10 providers): ${summary.evidenced_any}/${summary.requested} requested codes evidenced; ${summary.unknown} unknown. Missing evidence is unknown, not proof that a service is unavailable.\n\n`;
 }
 
+const DECISION_REPORT_URL_PREFIX = 'https://www.getpracticehelp.com/decision-report/';
+// Pass the offer through only in its closed shape: available true, a short string, a GPH offer-page URL.
+function decisionReportField(f, resultCount) {
+  if (!resultCount || !f || typeof f !== 'object' || f.available !== true) return null;
+  if (typeof f.what_it_adds !== 'string' || !f.what_it_adds || f.what_it_adds.length > 400) return null;
+  if (typeof f.url !== 'string' || !f.url.startsWith(DECISION_REPORT_URL_PREFIX) || /[\s<>"']/.test(f.url)) return null;
+  return { available: true, what_it_adds: f.what_it_adds, url: f.url };
+}
+
 export async function callTool(name, args) {
   return withAttribution(name, args, await callToolRaw(name, args));
 }
@@ -727,7 +736,13 @@ async function callToolRaw(name, args) {
     // per-row label line above and in match.js's own geoHonestyNote computation.
     const honestyPrefix = data.geo_honesty_note ? `_${data.geo_honesty_note}_\n\n` : '';
 
-    return { content: [{ type: 'text', text: `${honestyPrefix}${matchNeedsSummary(data.needs_summary)}Found ${data.total || matches.length} providers. Top ${matches.length} matches:\n\n${text}` }], count: data.total ?? matches.length, ids: { surfaced: matches.map(m => m.slug).filter(Boolean) } };
+    const result = { content: [{ type: 'text', text: `${honestyPrefix}${matchNeedsSummary(data.needs_summary)}Found ${data.total || matches.length} providers. Top ${matches.length} matches:\n\n${text}` }], count: data.total ?? matches.length, ids: { surfaced: matches.map(m => m.slug).filter(Boolean) } };
+    // C1712 s.3.1 (C1707 s.3.2): the decision report offer rides AFTER the free results as one structured field.
+    // Only added when /api/match sent it (kill switch on, results present) and it has the closed shape; the free
+    // results text, count and ids above are never touched, and without the field the result is byte-identical.
+    const dr = decisionReportField(data.decision_report, matches.length);
+    if (dr) result.decision_report = dr;
+    return result;
   }
 
   if (name === 'search_providers') {
