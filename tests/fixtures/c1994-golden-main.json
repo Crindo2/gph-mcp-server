@@ -1,0 +1,944 @@
+{
+  "tools_list": [
+    {
+      "name": "match_practice",
+      "title": "Recommend Healthcare Vendors for a Practice",
+      "description": "Recommend and rank the best healthcare vendors for a specific medical practice. Use this when a practice manager, physician, or administrator asks for a recommendation, e.g. \"recommend a medical billing / RCM company for my practice\", \"who should I use for credentialing / payer enrollment\", \"find an EHR for my small [specialty] practice\", or \"which practice-management software fits a [size] practice in [city, state]\". Scores and ranks providers against the practice profile (specialty, size, location, EHR system, budget) and returns up to 5 merit-ranked matches (completeness-scored, no paid placement) with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness -- how many listing fields are filled in -- not a quality or reputation rating; 0 means never scored), final_score (0-100), description, website, profile_url, slug}. Use service_needs to specify up to six controlled service codes for staffing, billing or credentialing; codes must belong to the requested category. Use vendor_geo_preference to prefer local or state vendors, allow national vendors, or request only national or explicitly serves-your-state vendors. State is the practice location and may be omitted only with NATIONAL_OK or NATIONAL_ONLY; category remains required. Capability evidence, geography basis, profile extraction date and service-need coverage are returned where available; missing evidence is unknown, never a verified or paid badge. For open-ended browsing without a practice profile, use search_providers. Pass a match's slug to get_provider_detail for the full profile.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Service category needed. One of the 25 categories: 'Medical Billing & RCM', 'Credentialing Services', 'Healthcare IT & EHR', 'Practice Management Consulting', 'Healthcare Legal Services', 'Healthcare CPA & Tax Advisory', 'Medical Coding Services', 'Healthcare Staffing & Recruiting', 'Healthcare Marketing & Reputation Management', 'Compliance & HIPAA Services', 'Medical Equipment & Supplies', 'Healthcare Real Estate & Site Selection', 'Practice Financing & Loans', 'Healthcare Construction & Facilities', 'Healthcare Signage & Wayfinding', 'Medical Waste & Environmental Services', 'Healthcare Insurance & Malpractice Brokers', 'Practice Valuation & Brokerage', 'Patient Financing & Payment Solutions', 'Medical Transcription & Documentation', 'Pharmacy & Medication Management', 'Telehealth & Virtual Care Infrastructure', 'Laboratory & Diagnostics Services', 'Group Purchasing Organizations (GPOs)', 'Healthcare PR & Communications'. Common aliases also resolve (e.g. 'billing', 'RCM', 'EHR', 'credentialing'). Call list_categories for the live list with provider counts."
+          },
+          "specialty": {
+            "type": "string",
+            "description": "Medical specialty of the practice (e.g. 'Family Medicine', 'Cardiology', 'Pediatrics', 'Dermatology')"
+          },
+          "practice_size": {
+            "type": "string",
+            "description": "Size of the practice by provider count. The parameter is named `practice_size`, not `size`.",
+            "enum": [
+              "Solo",
+              "Small",
+              "Mid-size",
+              "Large"
+            ]
+          },
+          "city": {
+            "type": "string",
+            "description": "City where the practice is located. Send city and state separately, not as a combined `location` string."
+          },
+          "state": {
+            "type": "string",
+            "description": "Practice location as a two-letter state abbreviation (e.g. 'TX', 'CA', 'NY'). Required unless vendor_geo_preference is NATIONAL_OK or NATIONAL_ONLY. Send as `state`, not `state_abbr` (`state_abbr` is an output field name only)."
+          },
+          "ehr_system": {
+            "type": "string",
+            "description": "EHR system used by the practice (e.g. 'Epic', 'athenahealth', 'AdvancedMD', 'eClinicalWorks'). Helps score providers with compatible integrations higher."
+          },
+          "budget_range": {
+            "type": "string",
+            "description": "Approximate monthly budget",
+            "enum": [
+              "Under $500",
+              "$500-$2,000",
+              "$2,000-$5,000",
+              "$5,000+",
+              "Not sure"
+            ]
+          },
+          "vendor_geo_preference": {
+            "type": "string",
+            "enum": [
+              "LOCAL_PREFERRED",
+              "STATE_PREFERRED",
+              "NATIONAL_OK",
+              "NATIONAL_ONLY"
+            ],
+            "description": "Vendor geography preference, separate from practice location: LOCAL_PREFERRED prefers same-city vendors, STATE_PREFERRED prefers in-state vendors, NATIONAL_OK allows national vendors to compete across geography tiers, and NATIONAL_ONLY restricts eligibility to national or explicitly serves-your-state vendors. State may be omitted for NATIONAL_OK or NATIONAL_ONLY."
+          },
+          "service_needs": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "STAFFING_ROLE_NP",
+                "STAFFING_ROLE_PA",
+                "STAFFING_ROLE_APP",
+                "STAFFING_ROLE_PHYSICIAN",
+                "STAFFING_ROLE_RN",
+                "STAFFING_ROLE_ALLIED",
+                "STAFFING_ROLE_CLINICAL_SUPPORT",
+                "STAFFING_ENG_PERMANENT",
+                "STAFFING_ENG_LOCUM",
+                "STAFFING_ENG_TEMPORARY",
+                "STAFFING_ENG_TEMP_TO_HIRE",
+                "STAFFING_ENG_PRN",
+                "STAFFING_SET_URGENT_CARE",
+                "STAFFING_SET_OUTPATIENT",
+                "STAFFING_SET_PRIMARY_CARE",
+                "STAFFING_SET_EMERGENCY",
+                "STAFFING_SET_INPATIENT",
+                "BILLING_SCOPE_FULL_RCM",
+                "BILLING_SCOPE_CLAIMS_SUBMISSION",
+                "BILLING_SCOPE_DENIAL_MANAGEMENT",
+                "BILLING_SCOPE_AR_FOLLOWUP",
+                "BILLING_SCOPE_PATIENT_BILLING",
+                "BILLING_SCOPE_CHARGE_CAPTURE",
+                "BILLING_SCOPE_ELIGIBILITY_VERIFICATION",
+                "BILLING_SCOPE_CODING",
+                "CRED_PAYER_ENROLLMENT",
+                "CRED_INITIAL_CREDENTIALING",
+                "CRED_RECREDENTIALING",
+                "CRED_CAQH",
+                "CRED_HOSPITAL_PRIVILEGING",
+                "CRED_STATE_LICENSING",
+                "CRED_MEDICARE_MEDICAID_ENROLLMENT",
+                "CRED_DELEGATED_CREDENTIALING"
+              ]
+            },
+            "maxItems": 6,
+            "uniqueItems": true,
+            "description": "Up to six distinct controlled service codes, never free text. STAFFING_* codes apply to Healthcare Staffing & Recruiting, BILLING_* codes to Medical Billing & RCM, and CRED_* codes to Credentialing Services (including aliases). Within a staffing facet codes are alternatives; across facets they ask for combined coverage. Un-evidenced needs are unknown and never exclude a vendor."
+          }
+        },
+        "required": [
+          "category"
+        ],
+        "anyOf": [
+          {
+            "required": [
+              "state"
+            ]
+          },
+          {
+            "required": [
+              "vendor_geo_preference"
+            ],
+            "properties": {
+              "vendor_geo_preference": {
+                "enum": [
+                  "NATIONAL_OK",
+                  "NATIONAL_ONLY"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ]
+            }
+          },
+          "isError": {
+            "type": "boolean",
+            "description": "Present and true only on failure (match request error or no candidates)."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Total scored candidates before the top-5 slice; absent when isError."
+          },
+          "ids": {
+            "type": "object",
+            "properties": {
+              "surfaced": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Provider slugs shown, in ranked order."
+              }
+            },
+            "description": "Absent when isError."
+          }
+        },
+        "required": [
+          "content"
+        ]
+      }
+    },
+    {
+      "name": "search_providers",
+      "title": "Search the Healthcare Vendor Directory",
+      "description": "Browse and filter the healthcare vendor directory. Use this for open-ended exploration, e.g. \"show me medical billing companies in Texas\", \"list credentialing services\", \"what EHR vendors are there for cardiology\", or when the user wants to page through options rather than get a scored shortlist. Paginated results filtered by category, location, minimum profile-completeness score, curated Tier-1 grade, and practice-size fit; returns a page of providers with {company_name, category, city, state_abbr, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), contact info, slug}. For a scored recommendation to a specific practice profile, use match_practice instead. Pass a returned slug to get_provider_detail for the full profile.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Service category to search. One of the 25 categories: 'Medical Billing & RCM', 'Credentialing Services', 'Healthcare IT & EHR', 'Practice Management Consulting', 'Healthcare Legal Services', 'Healthcare CPA & Tax Advisory', 'Medical Coding Services', 'Healthcare Staffing & Recruiting', 'Healthcare Marketing & Reputation Management', 'Compliance & HIPAA Services', 'Medical Equipment & Supplies', 'Healthcare Real Estate & Site Selection', 'Practice Financing & Loans', 'Healthcare Construction & Facilities', 'Healthcare Signage & Wayfinding', 'Medical Waste & Environmental Services', 'Healthcare Insurance & Malpractice Brokers', 'Practice Valuation & Brokerage', 'Patient Financing & Payment Solutions', 'Medical Transcription & Documentation', 'Pharmacy & Medication Management', 'Telehealth & Virtual Care Infrastructure', 'Laboratory & Diagnostics Services', 'Group Purchasing Organizations (GPOs)', 'Healthcare PR & Communications'. Common aliases also resolve (e.g. 'billing', 'RCM', 'EHR', 'credentialing'). Call list_categories for the live list with provider counts. This tool does NOT accept a specialty filter -- use match_practice for specialty-aware ranking."
+          },
+          "state": {
+            "type": "string",
+            "description": "Two-letter state abbreviation (e.g. 'TX'). Send as `state`, not `state_abbr` (`state_abbr` is an output field name only). National providers always included."
+          },
+          "city": {
+            "type": "string",
+            "description": "City to filter by. Matches one exact city only: the value is compared as a city slug (case and punctuation ignored, e.g. 'San Antonio' matches 'san-antonio'); partial names and prefixes do not match."
+          },
+          "min_rating": {
+            "type": "number",
+            "description": "Minimum profile-completeness score (0-100; how many listing fields are filled in, not a quality or reputation rating). Most providers score 50-85. The parameter is named `min_rating`, not `min_quality_score`.",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "tier1_grade": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B"
+            ],
+            "description": "Filter to the curated Tier-1 provider set by grade: 'A' (top-graded) or 'B' (strong). Tier-1 is a hand-reviewed ~4,400-provider subset; most directory records are not Tier-1, so this narrows results sharply. Omit to search the full directory."
+          },
+          "practice_size_fit": {
+            "type": "string",
+            "enum": [
+              "Solo",
+              "Small",
+              "Mid-size",
+              "Large",
+              "All"
+            ],
+            "description": "Filter providers by the practice size they best serve, on the directory's one closed vocabulary: Solo, Small, Mid-size, Large, All. The filter reads the extracted size where one exists and the listing's stated fit otherwise; a listing stating 'Solo/Small' answers both Solo and Small. 'All' means the vendor serves every size -- on listings that were never extracted it is also the default, so it narrows results little."
+          },
+          "per_page": {
+            "type": "number",
+            "description": "Results per page (1-25, default 10)",
+            "minimum": 1,
+            "maximum": 25,
+            "default": 10
+          },
+          "page": {
+            "type": "number",
+            "description": "Page number for pagination (default 1)",
+            "minimum": 1,
+            "default": 1
+          }
+        },
+        "required": [
+          "category"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ]
+            }
+          },
+          "isError": {
+            "type": "boolean",
+            "description": "Present and true only on failure."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Total matching providers across all pages; absent when isError."
+          },
+          "ids": {
+            "type": "object",
+            "properties": {
+              "surfaced": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Provider slugs on this page, in returned order."
+              }
+            },
+            "description": "Absent when isError."
+          }
+        },
+        "required": [
+          "content"
+        ]
+      }
+    },
+    {
+      "name": "get_provider_detail",
+      "title": "Get Vendor Profile Detail",
+      "description": "Get the full profile of one healthcare vendor by slug. Use this after match_practice or search_providers when the user asks to \"tell me more about [vendor]\", \"what services does [vendor] offer\", \"where did GPH get this information\", or wants contact info or services for a specific provider. Returns company_name, category, city/state, quality_score (0-100; profile completeness, not a quality rating; 0 means never scored), description, services offered, practice_size_fit, phone and website where listed, Google rating and Google review count where present, a Provenance section that labels each fact GPH-researched, Vendor-supplied, GPH-verified or GPH conclusion with its last-checked date where one exists, and the profile URL. No listing carries a verified badge: the legacy verified flag is not a recorded check and is not shown. Where a vendor has been enrichment-extracted, the description, services and practice-size fit come from that extraction, the profile adds certifications and compliance attestations, locations served and founding year where extracted, and the response states the extraction confidence and what it was grounded in (where the extraction abstained on practice-size fit, the legacy listing value is returned and labelled as not extracted); otherwise the legacy listing fields are returned. Slug comes from match_practice or search_providers results; returns an error if the slug is unknown.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "Provider slug identifier (e.g. 'ams-solutions-inc-dallas-tx'). Obtained from match_practice or search_providers response."
+          }
+        },
+        "required": [
+          "slug"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ]
+            }
+          },
+          "isError": {
+            "type": "boolean",
+            "description": "Present and true only when the slug is unknown or the fetch fails."
+          },
+          "count": {
+            "const": 1,
+            "description": "Always 1 on success; absent when isError."
+          },
+          "ids": {
+            "type": "object",
+            "properties": {
+              "drilled": {
+                "type": "string",
+                "description": "The slug that was looked up."
+              }
+            },
+            "description": "Absent when isError."
+          }
+        },
+        "required": [
+          "content"
+        ]
+      }
+    },
+    {
+      "name": "list_categories",
+      "title": "List Healthcare Vendor Categories",
+      "description": "List every service category in the GPH vendor directory with its live provider count. Call this FIRST when you do not already know which category fits the user's need, when a category search returned nothing, or when the user asks what kinds of vendors are available. Returns all 25 categories with {category, slug, providers}. The category names returned here are the exact values match_practice and search_providers expect (common aliases also resolve). Takes no arguments.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "const": "text"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "text"
+              ]
+            }
+          },
+          "isError": {
+            "type": "boolean",
+            "description": "Present and true only on failure."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of categories returned; absent when isError."
+          }
+        },
+        "required": [
+          "content"
+        ]
+      }
+    },
+    {
+      "name": "get_ehr_product_detail",
+      "title": "Get EHR Product Detail",
+      "description": "Read the free versioned EHR product JSON projection by exact product key. Returns the complete HTTP JSON body, including explicit edition records, facts, plans, conditions, sources and publication metadata. Optional edition_key validates an explicit identity under this product; the full product response is returned unchanged. No alias resolution, edition inheritance, calculation or ranking. Unknown values and open bounds remain unchanged. Company profiles use get_provider_detail.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "product_key": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "Exact P1 product key; aliases are not accepted."
+          },
+          "edition_key": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "Optional exact edition key explicitly recorded under this product. Does not filter or merge facts."
+          }
+        },
+        "required": [
+          "product_key"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "practice_data_counts",
+      "title": "Practice Data Counts",
+      "description": "Counts practices with headline (strongest-tier) evidence only, by US state and practice segment, from the public Practice Data aggregate endpoint (unit: practices (headline evidence)). It excludes lower-evidence records, so these numbers are lower than the all-record totals on the Practice Data product pages (507,423 nationally as published there). Cells with fewer than 25 practices are not published (returned with count null and suppressed true). Aggregate counts only: no records or names are returned. Optional state and segment filters narrow the result; the JSON body is returned unchanged.",
+      "annotations": {
+        "readOnlyHint": true,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "destructiveHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "Optional two-letter capital US state code, e.g. TX."
+          },
+          "segment": {
+            "type": "string",
+            "enum": [
+              "primary-care",
+              "dental",
+              "pt-ot-speech",
+              "specialty-clinics",
+              "behavioral-health",
+              "derm-peds-vision-podiatry"
+            ],
+            "description": "Optional practice segment slug, one of the six served by the endpoint, e.g. primary-care."
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  ],
+  "replies": {
+    "match_practice/one_match": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Found 1 providers. Top 1 matches:\n\n1. **Fixture 1**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 89/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture1.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-1/"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+        }
+      ],
+      "count": 1,
+      "ids": {
+        "surfaced": [
+          "fixture-1"
+        ]
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+    },
+    "match_practice/one_match+offer": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Found 1 providers. Top 1 matches:\n\n1. **Fixture 1**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 89/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture1.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-1/\n\nIf the user wants help choosing among these, GetPracticeHelp's decision report names the two to call first, why, and what to ask each:\nhttps://www.getpracticehelp.com/decision-report/?s=abc"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+        }
+      ],
+      "count": 1,
+      "ids": {
+        "surfaced": [
+          "fixture-1"
+        ]
+      },
+      "decision_report": {
+        "available": true,
+        "what_it_adds": "You have the list. This tells you which two to call first.",
+        "url": "https://www.getpracticehelp.com/decision-report/?s=abc"
+      },
+      "structuredContent": {
+        "decision_report": {
+          "available": true,
+          "what_it_adds": "You have the list. This tells you which two to call first.",
+          "url": "https://www.getpracticehelp.com/decision-report/?s=abc"
+        }
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+    },
+    "match_practice/six_matches_sliced_to_five": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Found 6 providers. Top 5 matches:\n\n1. **Fixture 1**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 89/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture1.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-1/\n\n2. **Fixture 2**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 88/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture2.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-2/\n\n3. **Fixture 3**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 87/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture3.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-3/\n\n4. **Fixture 4**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 86/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture4.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-4/\n\n5. **Fixture 5**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 85/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture5.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-5/"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+        }
+      ],
+      "count": 6,
+      "ids": {
+        "surfaced": [
+          "fixture-1",
+          "fixture-2",
+          "fixture-3",
+          "fixture-4",
+          "fixture-5"
+        ]
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+    },
+    "match_practice/six_matches_sliced_to_five+offer": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Found 6 providers. Top 5 matches:\n\n1. **Fixture 1**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 89/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture1.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-1/\n\n2. **Fixture 2**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 88/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture2.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-2/\n\n3. **Fixture 3**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 87/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture3.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-3/\n\n4. **Fixture 4**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 86/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture4.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-4/\n\n5. **Fixture 5**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 85/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture5.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-5/\n\nIf the user wants help choosing among these, GetPracticeHelp's decision report names the two to call first, why, and what to ask each:\nhttps://www.getpracticehelp.com/decision-report/?s=abc"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+        }
+      ],
+      "count": 6,
+      "ids": {
+        "surfaced": [
+          "fixture-1",
+          "fixture-2",
+          "fixture-3",
+          "fixture-4",
+          "fixture-5"
+        ]
+      },
+      "decision_report": {
+        "available": true,
+        "what_it_adds": "You have the list. This tells you which two to call first.",
+        "url": "https://www.getpracticehelp.com/decision-report/?s=abc"
+      },
+      "structuredContent": {
+        "decision_report": {
+          "available": true,
+          "what_it_adds": "You have the list. This tells you which two to call first.",
+          "url": "https://www.getpracticehelp.com/decision-report/?s=abc"
+        }
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+    },
+    "match_practice/with_evidence_and_summary": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Service-need coverage across the API shortlist (up to 10 providers): 1/1 requested codes evidenced; 0 unknown. Missing evidence is unknown, not proof that a service is unavailable.\n\nFound 2 providers. Top 2 matches:\n\n1. **Fixture 1** _(National vendor)_\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 89/100\n   Profile extraction date: 2026-10-01.\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture1.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-1/\n\n2. **Fixture 2** _(Regional vendor)_\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 88/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture2.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-2/"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+        }
+      ],
+      "count": 2,
+      "ids": {
+        "surfaced": [
+          "fixture-1",
+          "fixture-2"
+        ]
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+    },
+    "match_practice/with_evidence_and_summary+offer": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Service-need coverage across the API shortlist (up to 10 providers): 1/1 requested codes evidenced; 0 unknown. Missing evidence is unknown, not proof that a service is unavailable.\n\nFound 2 providers. Top 2 matches:\n\n1. **Fixture 1** _(National vendor)_\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 89/100\n   Profile extraction date: 2026-10-01.\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture1.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-1/\n\n2. **Fixture 2** _(Regional vendor)_\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 88/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture2.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-2/\n\nIf the user wants help choosing among these, GetPracticeHelp's decision report names the two to call first, why, and what to ask each:\nhttps://www.getpracticehelp.com/decision-report/?s=abc"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+        }
+      ],
+      "count": 2,
+      "ids": {
+        "surfaced": [
+          "fixture-1",
+          "fixture-2"
+        ]
+      },
+      "decision_report": {
+        "available": true,
+        "what_it_adds": "You have the list. This tells you which two to call first.",
+        "url": "https://www.getpracticehelp.com/decision-report/?s=abc"
+      },
+      "structuredContent": {
+        "decision_report": {
+          "available": true,
+          "what_it_adds": "You have the list. This tells you which two to call first.",
+          "url": "https://www.getpracticehelp.com/decision-report/?s=abc"
+        }
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+    },
+    "match_practice/honesty_note": {
+      "content": [
+        {
+          "type": "text",
+          "text": "_All results are national vendors._\n\nFound 1 providers. Top 1 matches:\n\n1. **Fixture 1**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 89/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture1.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-1/"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+        }
+      ],
+      "count": 1,
+      "ids": {
+        "surfaced": [
+          "fixture-1"
+        ]
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+    },
+    "match_practice/honesty_note+offer": {
+      "content": [
+        {
+          "type": "text",
+          "text": "_All results are national vendors._\n\nFound 1 providers. Top 1 matches:\n\n1. **Fixture 1**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 89/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture1.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-1/\n\nIf the user wants help choosing among these, GetPracticeHelp's decision report names the two to call first, why, and what to ask each:\nhttps://www.getpracticehelp.com/decision-report/?s=abc"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+        }
+      ],
+      "count": 1,
+      "ids": {
+        "surfaced": [
+          "fixture-1"
+        ]
+      },
+      "decision_report": {
+        "available": true,
+        "what_it_adds": "You have the list. This tells you which two to call first.",
+        "url": "https://www.getpracticehelp.com/decision-report/?s=abc"
+      },
+      "structuredContent": {
+        "decision_report": {
+          "available": true,
+          "what_it_adds": "You have the list. This tells you which two to call first.",
+          "url": "https://www.getpracticehelp.com/decision-report/?s=abc"
+        }
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+    },
+    "match_practice/no_results": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Found 0 providers. Top 0 matches:\n\nNo matching providers found for your criteria. Try broadening your search (e.g. remove city filter or change category)."
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+        }
+      ],
+      "count": 0,
+      "ids": {
+        "surfaced": []
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+    },
+    "match_practice/api_failure": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Match failed: boom"
+        }
+      ],
+      "isError": true
+    },
+    "list_categories/list_categories": {
+      "content": [
+        {
+          "type": "text",
+          "text": "1 service categories, 3,536 providers total:\n\n- **Medical Billing** -- 3,536 providers\n\nPass a category name to search_providers or match_practice exactly as written above."
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=list_categories"
+        }
+      ],
+      "count": 1,
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=list_categories"
+    },
+    "list_categories/list_categories_fail": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Could not load categories: 500"
+        }
+      ],
+      "isError": true
+    },
+    "search_providers/search_ok": {
+      "content": [
+        {
+          "type": "text",
+          "text": "2 total results (page 1):\n\n1. **Fixture 1**, Austin, TX\n   Profile Completeness: 75/100\n   Category: Medical Billing\n   Phone: 555-0100\n   Website: https://fixture1.example/\n\n2. **Fixture 2**, Austin, TX\n   Profile Completeness: 75/100\n   Category: Medical Billing\n   Phone: 555-0100\n   Website: https://fixture2.example/"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=search_providers"
+        }
+      ],
+      "count": 2,
+      "ids": {
+        "surfaced": [
+          "fixture-1",
+          "fixture-2"
+        ]
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=search_providers"
+    },
+    "search_providers/search_ok/serveTool": {
+      "content": [
+        {
+          "type": "text",
+          "text": "2 total results (page 1):\n\n1. **Fixture 1**, Austin, TX\n   Profile Completeness: 75/100\n   Category: Medical Billing\n   Phone: 555-0100\n   Website: https://fixture1.example/\n\n2. **Fixture 2**, Austin, TX\n   Profile Completeness: 75/100\n   Category: Medical Billing\n   Phone: 555-0100\n   Website: https://fixture2.example/"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=search_providers"
+        }
+      ],
+      "count": 2,
+      "ids": {
+        "surfaced": [
+          "fixture-1",
+          "fixture-2"
+        ]
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=search_providers"
+    },
+    "search_providers/search_empty": {
+      "content": [
+        {
+          "type": "text",
+          "text": "0 total results (page 1):\n\nNo providers found matching your criteria."
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=search_providers"
+        }
+      ],
+      "count": 0,
+      "ids": {
+        "surfaced": []
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=search_providers"
+    },
+    "search_providers/search_empty/serveTool": {
+      "content": [
+        {
+          "type": "text",
+          "text": "0 total results (page 1):\n\nNo providers found matching your criteria."
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=search_providers"
+        }
+      ],
+      "count": 0,
+      "ids": {
+        "surfaced": []
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=search_providers"
+    },
+    "search_providers/search_fail": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Search failed: boom"
+        }
+      ],
+      "isError": true
+    },
+    "search_providers/search_fail/serveTool": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Search failed: boom"
+        }
+      ],
+      "isError": true
+    },
+    "get_provider_detail/provider_ok": {
+      "content": [
+        {
+          "type": "text",
+          "text": "# Fixture 1\n**Category:** Medical Billing\n**Location:** Austin, TX\n**Profile Completeness:** 75/100\n## About\nA vendor.\n**Phone:** 555-0100\n**Website:** https://fixture1.example/\n**Profile:** https://www.getpracticehelp.com/providers/fixture-1/"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/providers/fixture-1/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=get_provider_detail"
+        }
+      ],
+      "count": 1,
+      "ids": {
+        "drilled": "fixture-1"
+      },
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/providers/fixture-1/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=get_provider_detail"
+    },
+    "get_provider_detail/provider_missing": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Provider not found: nope"
+        }
+      ],
+      "isError": true,
+      "count": 0
+    },
+    "get_provider_detail/provider_no_slug": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Error: slug is required"
+        }
+      ],
+      "isError": true
+    },
+    "get_ehr_product_detail/ehr_ok": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"schema_version\":\"1.0.0\",\"publication_version\":\"synthetic-contract-fixture\",\"generated_from\":{},\"product\":{\"product_key\":\"nextgen-healthcare\",\"vendor_key\":\"nextgen-healthcare\",\"display_name\":\"Synthetic fixture\",\"product_class\":\"ehr\",\"aliases\":[],\"vendor\":{},\"editions\":[{\"product_key\":\"nextgen-healthcare\",\"edition_key\":\"office\",\"subject\":\"edition:nextgen-healthcare/office\",\"facts\":[{\"status\":\"unknown\"}]},{\"product_key\":\"nextgen-healthcare\",\"edition_key\":\"enterprise\",\"facts\":[]}],\"edition_coverage\":\"partial\",\"facts\":[{\"status\":\"known\",\"value_num_min\":800,\"value_num_max\":null,\"currency\":\"USD\",\"unit\":\"month\"},{\"status\":\"known\",\"value_num_min\":0},{\"status\":\"unknown\"},{\"status\":\"vendor_does_not_publish\",\"value_json\":{\"included\":false}}],\"plans\":[{\"eligible\":null,\"basis\":[],\"components\":[]}],\"conditions\":[],\"excluded_base_slots\":[],\"sources\":[]}}"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=get_ehr_product_detail"
+        }
+      ],
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=get_ehr_product_detail"
+    },
+    "get_ehr_product_detail/ehr_not_found": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"schema_version\":\"1.0.0\",\"error\":\"product_not_found\"}"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=get_ehr_product_detail"
+        }
+      ],
+      "source": "GetPracticeHelp",
+      "url": "https://www.getpracticehelp.com/providers/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=get_ehr_product_detail"
+    },
+    "practice_data_counts/counts_ok": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"schema_version\":1,\"as_of\":\"2026-11-04\",\"unit\":\"practices (headline evidence)\",\"min_cell\":25,\"states\":[{\"state\":\"TX\",\"segments\":[{\"segment_code\":\"X\",\"segment_slug\":\"other\",\"label\":\"Other\",\"count\":null,\"suppressed\":true}]}]}"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp Practice Data https://www.getpracticehelp.com/data/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=practice_data_counts"
+        }
+      ],
+      "count": 0,
+      "source": "GetPracticeHelp Practice Data",
+      "url": "https://www.getpracticehelp.com/data/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=practice_data_counts"
+    },
+    "practice_data_counts/counts_state": {
+      "content": [
+        {
+          "type": "text",
+          "text": "{\"schema_version\":1,\"as_of\":\"2026-11-04\",\"unit\":\"practices (headline evidence)\",\"min_cell\":25,\"states\":[{\"state\":\"TX\",\"segments\":[{\"segment_code\":\"X\",\"segment_slug\":\"other\",\"label\":\"Other\",\"count\":null,\"suppressed\":true}]}]}"
+        },
+        {
+          "type": "text",
+          "text": "Source: GetPracticeHelp Practice Data https://www.getpracticehelp.com/data/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=practice_data_counts"
+        }
+      ],
+      "count": 0,
+      "source": "GetPracticeHelp Practice Data",
+      "url": "https://www.getpracticehelp.com/data/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=practice_data_counts"
+    }
+  }
+}

@@ -1,7 +1,9 @@
 // C1569 s.5: every successful tool response carries a citation: `source` and a `url` to the
 // matching public page, tagged so click-throughs from AI answers show in our own analytics.
 // The tool's own content[0] (including the practice_data_counts JSON body) is never altered;
-// the citation rides as top-level fields plus one trailing text block.
+// the citation rides as top-level fields plus one trailing text block. C1994 s.3: that block starts with a
+// blank line, so the Source line sits on its own line after a blank line when a client joins the text blocks
+// (otherwise it ran into the last address of the reply: "...<session id>Source: GetPracticeHelp").
 const SITE = 'https://www.getpracticehelp.com';
 const DATA_SOURCE = 'GetPracticeHelp Practice Data';
 const DIRECTORY_SOURCE = 'GetPracticeHelp';
@@ -28,5 +30,5 @@ export function attributionFor(name, args) {
 export function withAttribution(name, args, result) {
   if (!result || result.isError || !Array.isArray(result.content)) return result;
   const { source, url } = attributionFor(name, args);
-  return { ...result, content: [...result.content, { type: 'text', text: `Source: ${source} ${url}` }], source, url };
+  return { ...result, content: [...result.content, { type: 'text', text: `\n\nSource: ${source} ${url}` }], source, url };
 }

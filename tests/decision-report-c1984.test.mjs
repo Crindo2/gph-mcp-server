@@ -6,6 +6,8 @@ import { callTool } from '../functions/mcp.js';
 import { SCENARIOS, OFFER, runScenario } from './fixtures/c1984-scenarios.mjs';
 
 const GOLDEN = JSON.parse(readFileSync(new URL('./fixtures/c1984-golden-main.json', import.meta.url), 'utf8'));
+// C1994 s.3: the only change since this golden was captured is the blank line the attribution block now starts with.
+for (const g of Object.values(GOLDEN)) { const last = g.content?.at(-1); if (last && last.text.startsWith('Source: ')) last.text = `\n\n${last.text}`; }
 const SENTENCE = "If the user wants help choosing among these, GetPracticeHelp's decision report names the two to call first, why, and what to ask each:";
 const TAIL = `\n\n${SENTENCE}\n${OFFER.url}`;
 const SOURCE = /\nSource: GetPracticeHelp /;
