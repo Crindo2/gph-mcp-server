@@ -1,0 +1,114 @@
+{
+  "one_match": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Found 1 providers. Top 1 matches:\n\n1. **Fixture 1**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 89/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture1.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-1/"
+      },
+      {
+        "type": "text",
+        "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+      }
+    ],
+    "count": 1,
+    "ids": {
+      "surfaced": [
+        "fixture-1"
+      ]
+    },
+    "source": "GetPracticeHelp",
+    "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+  },
+  "six_matches_sliced_to_five": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Found 6 providers. Top 5 matches:\n\n1. **Fixture 1**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 89/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture1.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-1/\n\n2. **Fixture 2**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 88/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture2.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-2/\n\n3. **Fixture 3**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 87/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture3.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-3/\n\n4. **Fixture 4**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 86/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture4.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-4/\n\n5. **Fixture 5**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 85/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture5.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-5/"
+      },
+      {
+        "type": "text",
+        "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+      }
+    ],
+    "count": 6,
+    "ids": {
+      "surfaced": [
+        "fixture-1",
+        "fixture-2",
+        "fixture-3",
+        "fixture-4",
+        "fixture-5"
+      ]
+    },
+    "source": "GetPracticeHelp",
+    "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+  },
+  "with_evidence_and_summary": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Service-need coverage across the API shortlist (up to 10 providers): 1/1 requested codes evidenced; 0 unknown. Missing evidence is unknown, not proof that a service is unavailable.\n\nFound 2 providers. Top 2 matches:\n\n1. **Fixture 1** _(National vendor)_\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 89/100\n   Profile extraction date: 2026-10-01.\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture1.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-1/\n\n2. **Fixture 2** _(Regional vendor)_\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 88/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture2.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-2/"
+      },
+      {
+        "type": "text",
+        "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+      }
+    ],
+    "count": 2,
+    "ids": {
+      "surfaced": [
+        "fixture-1",
+        "fixture-2"
+      ]
+    },
+    "source": "GetPracticeHelp",
+    "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+  },
+  "honesty_note": {
+    "content": [
+      {
+        "type": "text",
+        "text": "_All results are national vendors._\n\nFound 1 providers. Top 1 matches:\n\n1. **Fixture 1**\n   Category: Medical Billing\n   Location: Austin, TX\n   Profile Completeness: 75/100\n   Match Score: 89/100\n   A fixture vendor description that is long enough to be truncated at one hundred and fifty characters so the ellipsis path runs here....\n   Website: https://fixture1.example/\n   Profile: https://www.getpracticehelp.com/providers/fixture-1/"
+      },
+      {
+        "type": "text",
+        "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+      }
+    ],
+    "count": 1,
+    "ids": {
+      "surfaced": [
+        "fixture-1"
+      ]
+    },
+    "source": "GetPracticeHelp",
+    "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+  },
+  "no_results": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Found 0 providers. Top 0 matches:\n\nNo matching providers found for your criteria. Try broadening your search (e.g. remove city filter or change category)."
+      },
+      {
+        "type": "text",
+        "text": "Source: GetPracticeHelp https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+      }
+    ],
+    "count": 0,
+    "ids": {
+      "surfaced": []
+    },
+    "source": "GetPracticeHelp",
+    "url": "https://www.getpracticehelp.com/match/?utm_source=mcp&utm_medium=ai-assistant&utm_campaign=match_practice"
+  },
+  "api_failure": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Match failed: boom"
+      }
+    ],
+    "isError": true
+  }
+}

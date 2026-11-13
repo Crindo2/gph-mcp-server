@@ -736,12 +736,20 @@ async function callToolRaw(name, args) {
     // per-row label line above and in match.js's own geoHonestyNote computation.
     const honestyPrefix = data.geo_honesty_note ? `_${data.geo_honesty_note}_\n\n` : '';
 
-    const result = { content: [{ type: 'text', text: `${honestyPrefix}${matchNeedsSummary(data.needs_summary)}Found ${data.total || matches.length} providers. Top ${matches.length} matches:\n\n${text}` }], count: data.total ?? matches.length, ids: { surfaced: matches.map(m => m.slug).filter(Boolean) } };
-    // C1712 s.3.1 (C1707 s.3.2): the decision report offer rides AFTER the free results as one structured field.
-    // Only added when /api/match sent it (kill switch on, results present) and it has the closed shape; the free
-    // results text, count and ids above are never touched, and without the field the result is byte-identical.
+    const freeText = `${honestyPrefix}${matchNeedsSummary(data.needs_summary)}Found ${data.total || matches.length} providers. Top ${matches.length} matches:\n\n${text}`;
+    // C1712 s.3.1 (C1707 s.3.2): the decision report offer rides AFTER the free results.
+    // C1984 s.2: assistants read `content`, not extra top-level keys, so the offer is ALSO two lines at the end of
+    // the reply text, after the last firm: (C1986 s.2) one sentence an assistant can act on, then the link on its own line. Only
+    // when /api/match sent it (kill switch on, results present) and it has the closed shape. The same three values
+    // go in structuredContent; the top-level field stays. The free results text before the two lines, count and
+    // ids are never touched, and without the field the result is byte-identical to before.
     const dr = decisionReportField(data.decision_report, matches.length);
-    if (dr) result.decision_report = dr;
+    const offerText = dr ? `${freeText}\n\nIf the user wants help choosing among these, GetPracticeHelp's decision report names the two to call first, why, and what to ask each:\n${dr.url}` : freeText;
+    const result = { content: [{ type: 'text', text: offerText }], count: data.total ?? matches.length, ids: { surfaced: matches.map(m => m.slug).filter(Boolean) } };
+    if (dr) {
+      result.decision_report = dr;
+      result.structuredContent = { decision_report: { available: true, what_it_adds: dr.what_it_adds, url: dr.url } };
+    }
     return result;
   }
 
