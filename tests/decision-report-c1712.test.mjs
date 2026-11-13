@@ -20,10 +20,12 @@ test('decision_report is returned as one field after the results, free results u
   const keys = Object.keys(withOffer);
   assert.ok(keys.indexOf('decision_report') > keys.indexOf('content'));
   assert.equal(keys.filter(k => k === 'decision_report').length, 1);
-  assert.deepEqual(withOffer.content, base.content);
+  // C1984 s.2: the offer is now also two lines at the end of content[0]; the free text before them is unchanged.
+  assert.equal(withOffer.content[0].text, `${base.content[0].text}\n\n${OFFER.what_it_adds}\nDecision report: ${OFFER.url}`);
+  assert.deepEqual(withOffer.content.slice(1), base.content.slice(1));
   assert.equal(withOffer.count, base.count);
   assert.deepEqual(withOffer.ids, base.ids);
-  assert.equal(withOffer.content[0].text.includes('decision'), false);
+  assert.equal(base.content[0].text.includes('Decision report'), false);
 });
 
 test('without the field from the API the result is byte-identical and carries no decision_report key', async () => {
