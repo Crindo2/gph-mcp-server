@@ -20,8 +20,8 @@ test('decision_report is returned as one field after the results, free results u
   const keys = Object.keys(withOffer);
   assert.ok(keys.indexOf('decision_report') > keys.indexOf('content'));
   assert.equal(keys.filter(k => k === 'decision_report').length, 1);
-  // C1984 s.2: the offer is now also two lines at the end of content[0]; the free text before them is unchanged.
-  assert.equal(withOffer.content[0].text, `${base.content[0].text}\n\n${OFFER.what_it_adds}\nDecision report: ${OFFER.url}`);
+  // C1984 s.2: the offer is now also one sentence and the link on its own line at the end of content[0]; the free text before them is unchanged.
+  assert.equal(withOffer.content[0].text, `${base.content[0].text}\n\nIf the user wants help choosing among these, GetPracticeHelp's decision report names the two to call first, why, and what to ask each:\n${OFFER.url}`);
   assert.deepEqual(withOffer.content.slice(1), base.content.slice(1));
   assert.equal(withOffer.count, base.count);
   assert.deepEqual(withOffer.ids, base.ids);

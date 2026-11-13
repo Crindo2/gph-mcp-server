@@ -1,4 +1,4 @@
-// C1984 s.2: the decision report offer is also two lines at the end of the match_practice reply text.
+// C1984 s.2: the decision report offer is also one sentence and the link at the end of the match_practice reply text.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -6,7 +6,8 @@ import { callTool } from '../functions/mcp.js';
 import { SCENARIOS, OFFER, runScenario } from './fixtures/c1984-scenarios.mjs';
 
 const GOLDEN = JSON.parse(readFileSync(new URL('./fixtures/c1984-golden-main.json', import.meta.url), 'utf8'));
-const TAIL = `\n\n${OFFER.what_it_adds}\nDecision report: ${OFFER.url}`;
+const SENTENCE = "If the user wants help choosing among these, GetPracticeHelp's decision report names the two to call first, why, and what to ask each:";
+const TAIL = `\n\n${SENTENCE}\n${OFFER.url}`;
 const SOURCE = /\nSource: GetPracticeHelp /;
 
 test('field absent: every scenario reply is byte-identical to the golden captured from main before the change', async () => {
@@ -18,7 +19,7 @@ test('field absent: every scenario reply is byte-identical to the golden capture
   }
 });
 
-test('field present: free text is an unchanged prefix, the two lines follow the last firm, nothing else moves', async () => {
+test('field present: free text is an unchanged prefix, the sentence and link follow the last firm, nothing else moves', async () => {
   for (const n of ['one_match', 'six_matches_sliced_to_five', 'with_evidence_and_summary', 'honesty_note']) {
     const base = GOLDEN[n];
     const r = await runScenario(callTool, n, 'match_practice', { decision_report: OFFER });
@@ -35,8 +36,8 @@ test('field present: free text is an unchanged prefix, the two lines follow the 
     assert.ok(Object.keys(r).indexOf('decision_report') > Object.keys(r).indexOf('content'));
     // the offer sits after the last firm's Profile line
     const t = r.content[0].text;
-    assert.ok(t.lastIndexOf('   Profile: ') < t.indexOf(OFFER.what_it_adds), n);
-    // no price, refund wording or email ask in the added lines
+    assert.ok(t.lastIndexOf('   Profile: ') < t.indexOf(SENTENCE), n);
+    // no price, refund wording or email ask in the added text
     assert.equal(/\$|price|refund|e-?mail/i.test(TAIL), false);
     // free firm order unchanged
     const firms = s => [...s.matchAll(/^\d+\. \*\*(.+?)\*\*/gm)].map(m => m[1]);
@@ -44,7 +45,7 @@ test('field present: free text is an unchanged prefix, the two lines follow the 
   }
 });
 
-test('no results, API failure, or malformed offer: reply identical to golden, no offer lines', async () => {
+test('no results, API failure, or malformed offer: reply identical to golden, no offer text', async () => {
   for (const n of ['no_results', 'api_failure']) {
     const r = await runScenario(callTool, n, 'match_practice', { decision_report: OFFER });
     assert.equal(JSON.stringify(r), JSON.stringify(GOLDEN[n]), n);
@@ -55,9 +56,12 @@ test('no results, API failure, or malformed offer: reply identical to golden, no
   }
 });
 
-test('whitespace in what_it_adds cannot add lines to the reply', async () => {
-  const r = await runScenario(callTool, 'one_match', 'match_practice', { decision_report: { ...OFFER, what_it_adds: 'one\n\ntwo\r\nthree' } });
-  assert.ok(r.content[0].text.endsWith('\n\none two three\nDecision report: ' + OFFER.url));
+test('what_it_adds is not in the reply text; it stays in the structured field unchanged', async () => {
+  const w = 'one\n\ntwo';
+  const r = await runScenario(callTool, 'one_match', 'match_practice', { decision_report: { ...OFFER, what_it_adds: w } });
+  assert.equal(r.content[0].text.endsWith(TAIL), true);
+  assert.equal(r.structuredContent.decision_report.what_it_adds, w);
+  assert.equal(r.decision_report.what_it_adds, w);
 });
 
 test('other tools are untouched: an offer in a list_categories reply payload changes nothing', async () => {
