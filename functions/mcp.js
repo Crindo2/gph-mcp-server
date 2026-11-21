@@ -22,6 +22,7 @@ import {
 
 import { EHR_PRODUCT_TOOL, ehrProductDetail, validateEhrProductArgs } from './_shared/ehr-product-detail.js';
 import { withAttribution } from './_shared/attribution.js';
+import { withPagePointer, hintResult } from './_shared/page-pointers.js';
 import { PRACTICE_DATA_COUNTS_TOOL, practiceDataCounts, validatePracticeDataCountsArgs } from './_shared/practice-data-counts.js';
 
 const API_BASE = 'https://www.getpracticehelp.com/api';
@@ -685,7 +686,7 @@ function decisionReportField(f, resultCount) {
 }
 
 export async function callTool(name, args) {
-  return withAttribution(name, args, await callToolRaw(name, args));
+  return withAttribution(name, args, withPagePointer(name, args, await callToolRaw(name, args)));
 }
 
 async function callToolRaw(name, args) {
@@ -750,7 +751,8 @@ async function callToolRaw(name, args) {
       result.decision_report = dr;
       result.structuredContent = { decision_report: { available: true, what_it_adds: dr.what_it_adds, url: dr.url } };
     }
-    return result;
+    // C2284 s.5: the page pointer is chosen from the category the RESULTS carry, not the alias the caller typed.
+    return hintResult(result, { category: matches[0]?.category });
   }
 
   if (name === 'search_providers') {
@@ -843,7 +845,7 @@ async function callToolRaw(name, args) {
       `**Profile:** https://www.getpracticehelp.com/providers/${p.slug}/`,
     ].filter(Boolean).join('\n');
 
-    return { content: [{ type: 'text', text }], count: 1, ids: { drilled: args.slug || '' } };
+    return hintResult({ content: [{ type: 'text', text }], count: 1, ids: { drilled: args.slug || '' } }, { provider: p });
   }
 
   return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true };
@@ -994,7 +996,7 @@ export function renderSearchResult(args, data) {
       ].filter(Boolean).join('\n')).join('\n\n');
 
   const totalResults = data.pagination?.total ?? data.total ?? providers.length;
-  return { content: [{ type: 'text', text: `${totalResults} total results (page ${args.page || 1}):\n\n${text}` }], count: totalResults, ids: { surfaced: providers.map(p => p.slug).filter(Boolean) } };
+  return hintResult({ content: [{ type: 'text', text: `${totalResults} total results (page ${args.page || 1}):\n\n${text}` }], count: totalResults, ids: { surfaced: providers.map(p => p.slug).filter(Boolean) } }, { category: providers[0]?.category });
 }
 
 async function openSearchCache(env) {
@@ -1014,7 +1016,7 @@ export async function serveTool(name, args, { env = null, now = Date.now(), wait
   if (name === 'search_providers') {
     const cache = await openSearchCache(env);
     const { data, cacheStatus } = await fetchSearchData(args, { cache, now, waitUntil });
-    return { result: withAttribution(name, args, renderSearchResult(args, data)), cacheStatus };
+    return { result: withAttribution(name, args, withPagePointer(name, args, renderSearchResult(args, data))), cacheStatus };
   }
   return { result: await callTool(name, args), cacheStatus: null };
 }

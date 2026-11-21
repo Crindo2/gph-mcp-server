@@ -21,7 +21,9 @@ test('same set of replies as the golden captured from main', () => {
 test('every reply equals main except one inserted blank line before the attribution block', () => {
   let attributed = 0;
   for (const [k, base] of Object.entries(GOLDEN.replies)) {
-    const now = NOW.replies[k];
+    // C2284: the page_pointer field is the one allowed addition; tests/page-pointers.test.mjs pins it. Everything else is unchanged.
+    const now = structuredClone(NOW.replies[k]);
+    delete now.page_pointer;
     const hasSource = Array.isArray(base.content) && base.content.at(-1).text.startsWith('Source: ');
     if (!hasSource) { assert.deepEqual(now, base, `${k}: error/unattributed reply must be identical`); continue; }
     attributed++;
