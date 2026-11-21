@@ -28,16 +28,20 @@ test('every reply equals main except one inserted blank line before the attribut
     // exactly the last content item's text gained a leading "\n\n"; every other byte is the same
     const expected = structuredClone(base);
     expected.content.at(-1).text = `\n\n${expected.content.at(-1).text}`;
+    // C2285 s.8.4: the report link in the reply text carries ref=mcp; nothing else changes.
+    expected.content = expected.content.map(c => ({ ...c, text: c.text.replace(/decision-report\/\?s=abc(?=\n|$)/g, 'decision-report/?s=abc&ref=mcp') }));
     assert.equal(JSON.stringify(now), JSON.stringify(expected), k);
     assert.equal(now.content.length, base.content.length, k);
-    assert.deepEqual(now.content.slice(0, -1), base.content.slice(0, -1), k);
+    assert.deepEqual(now.content.slice(0, -1), expected.content.slice(0, -1), k);
     assert.equal(now.source, base.source, k);
     assert.equal(now.url, base.url, k);
     assert.deepEqual(now.structuredContent, base.structuredContent, k);
     // as a client would join the text blocks: the Source sits on its own line after exactly one blank line
     const joined = now.content.map(c => c.text).join('');
     assert.match(joined, /[^\n]\n\nSource: GetPracticeHelp/, k);
-    assert.equal(joined.replace('\n\nSource: ', 'Source: '), base.content.map(c => c.text).join(''), k);
+    // C2285 s.8.4: the golden is main's bare report link; the reply text now carries ref=mcp on that same link.
+    const marked = base.content.map(c => c.text.replace(/decision-report\/\?s=abc(?=\n|$)/g, 'decision-report/?s=abc&ref=mcp')).join('');
+    assert.equal(joined.replace('\n\nSource: ', 'Source: '), marked, k);
   }
   assert.ok(attributed >= 19, `attributed replies checked: ${attributed}`);
 });
@@ -50,10 +54,10 @@ test('every one of the six tools is covered by at least one attributed reply', (
 test('match_practice with the offer: sentence and address stay last in content[0]; the Source line follows after a blank line', async () => {
   const r = NOW.replies['match_practice/one_match+offer'];
   const t = r.content[0].text;
-  assert.ok(t.endsWith(`\n\n${SENTENCE}\nhttps://www.getpracticehelp.com/decision-report/?s=abc`));
+  assert.ok(t.endsWith(`\n\n${SENTENCE}\nhttps://www.getpracticehelp.com/decision-report/?s=abc&ref=mcp`));
   assert.equal(r.content[1].text.startsWith('\n\nSource: GetPracticeHelp https://www.getpracticehelp.com/match/'), true);
   const joined = r.content.map(c => c.text).join('');
-  assert.match(joined, /decision-report\/\?s=abc\n\nSource: GetPracticeHelp /);
+  assert.match(joined, /decision-report\/\?s=abc&ref=mcp\n\nSource: GetPracticeHelp /);
   assert.deepEqual(r.structuredContent.decision_report.url, 'https://www.getpracticehelp.com/decision-report/?s=abc');
 });
 
