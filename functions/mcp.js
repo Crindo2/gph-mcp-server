@@ -676,6 +676,9 @@ function matchNeedsSummary(summary) {
 }
 
 const DECISION_REPORT_URL_PREFIX = 'https://www.getpracticehelp.com/decision-report/';
+// C2285 s.8.4: the reply TEXT's report link carries the fixed marker ref=mcp, so the site counts assistant-referred
+// report views (no session id, no person data). structuredContent keeps the bare link.
+export function decisionReportReplyUrl(url) { return `${url}${url.includes('?') ? '&' : '?'}ref=mcp`; }
 // Pass the offer through only in its closed shape: available true, a short string, a GPH offer-page URL.
 function decisionReportField(f, resultCount) {
   if (!resultCount || !f || typeof f !== 'object' || f.available !== true) return null;
@@ -744,7 +747,7 @@ async function callToolRaw(name, args) {
     // go in structuredContent; the top-level field stays. The free results text before the two lines, count and
     // ids are never touched, and without the field the result is byte-identical to before.
     const dr = decisionReportField(data.decision_report, matches.length);
-    const offerText = dr ? `${freeText}\n\nIf the user wants help choosing among these, GetPracticeHelp's decision report names the two to call first, why, and what to ask each:\n${dr.url}` : freeText;
+    const offerText = dr ? `${freeText}\n\nIf the user wants help choosing among these, GetPracticeHelp's decision report names the two to call first, why, and what to ask each:\n${decisionReportReplyUrl(dr.url)}` : freeText;
     const result = { content: [{ type: 'text', text: offerText }], count: data.total ?? matches.length, ids: { surfaced: matches.map(m => m.slug).filter(Boolean) } };
     if (dr) {
       result.decision_report = dr;
