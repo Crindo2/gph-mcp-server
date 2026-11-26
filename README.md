@@ -37,6 +37,11 @@ Get the full profile for a specific vendor including description, services, cont
 **Parameters:**
 - `slug` (required) -- Vendor slug identifier (e.g. "ams-solutions-inc-dallas-tx")
 
+### `list_categories`
+Lists the 25 service categories with how many providers each one has. Pass a name from this list to `search_providers` or `match_practice` exactly as it is written.
+
+**Parameters:** none.
+
 ### `get_ehr_product_detail`
 Read the free P1 EHR product projection as JSON, with all publication metadata, facts, explicit editions, plans, conditions and sources unchanged.
 
@@ -120,6 +125,10 @@ Free, no API key required. The full public directory may be read, including ever
   ```
 - **403 from a browser** -- the `/mcp` endpoint validates the `Origin` header to prevent DNS rebinding. Standard MCP clients (Claude Desktop, `mcp-remote`, server-to-server) send no `Origin` header and connect fine; only disallowed browser origins are blocked.
 - **Support** -- questions or higher-volume access requests: cbeggroup@gmail.com
+
+## Privacy
+
+Each tool call writes one usage record to Cloudflare D1, copied to Airtable. It holds the tool name, the time, the arguments as sent, what came back (result count and the provider ids shown or opened), labels we derive from those, the caller's user-agent string, the referring page when one is sent, the calling network's country and operator as Cloudflare reports them, our classification of the caller, a one-way session hash, and the API key tier. Your raw IP address is never written to either store; it is used only for rate limiting and as a passing input to a daily-rotating session hash. The full policy, with the reason for each item, is at [gph-mcp-server.pages.dev/privacy](https://gph-mcp-server.pages.dev/privacy).
 
 ## Links
 
