@@ -4,10 +4,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { callTool } from '../functions/mcp.js';
 import { SCENARIOS, OFFER, runScenario } from './fixtures/c1984-scenarios.mjs';
+import { C1984_NOTES, addC2455Note } from './fixtures/c2455-notes.mjs';
 
 const GOLDEN = JSON.parse(readFileSync(new URL('./fixtures/c1984-golden-main.json', import.meta.url), 'utf8'));
 // C1994 s.3: the only change since this golden was captured is the blank line the attribution block now starts with.
 for (const g of Object.values(GOLDEN)) { const last = g.content?.at(-1); if (last && last.text.startsWith('Source: ')) last.text = `\n\n${last.text}`; }
+// C2455: and one added sentence on the replies listed in c2455-notes.mjs.
+for (const [n, sentence] of Object.entries(C1984_NOTES)) addC2455Note(GOLDEN[n], sentence);
 const SENTENCE = "If the user wants help choosing among these, GetPracticeHelp's decision report names the two to call first, why, and what to ask each:";
 const TAIL = `\n\n${SENTENCE}\n${OFFER.url}&ref=mcp`; // C2285 s.8.4: the reply link carries ref=mcp
 const SOURCE = /\nSource: GetPracticeHelp /;

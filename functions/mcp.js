@@ -23,6 +23,7 @@ import {
 import { EHR_PRODUCT_TOOL, ehrProductDetail, validateEhrProductArgs } from './_shared/ehr-product-detail.js';
 import { withAttribution } from './_shared/attribution.js';
 import { PRACTICE_DATA_COUNTS_TOOL, practiceDataCounts, validatePracticeDataCountsArgs } from './_shared/practice-data-counts.js';
+import { echo, stateProblem, withNote, andList } from './_shared/input-errors.js';
 
 const API_BASE = 'https://www.getpracticehelp.com/api';
 const AT_BASE = 'appvHqDMSu6aCwNxA';
@@ -306,6 +307,23 @@ const GPH_CATEGORIES = [
   'Healthcare PR & Communications',
 ];
 const CATEGORY_LIST_TEXT = GPH_CATEGORIES.map(c => `'${c}'`).join(', ');
+
+// C2455: was a zero result caused by a category the directory does not have? The alias table
+// lives upstream (private, not mirrored here), so this never refuses a call and never rewrites the
+// category: it is asked only after the upstream already returned nothing, and it says yes only
+// when not one word of three or more letters in the category appears in any of the 25 names.
+// 'billing', 'EHR', 'RCM' and 'Revenue Cycle Management' therefore never trip it; 'dentistry' does.
+const CATEGORY_WORDS = GPH_CATEGORIES.map(c => c.toLowerCase().replace(/[^a-z0-9]/g, ''));
+function categoryLooksUnknown(category) {
+  if (typeof category !== 'string' || !category.trim()) return false;
+  const words = category.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 3);
+  if (!words.length) return !CATEGORY_WORDS.some(c => c.includes(category.toLowerCase().replace(/[^a-z0-9]/g, '') || ' '));
+  return !words.some(w => CATEGORY_WORDS.some(c => c.includes(w)));
+}
+function unknownCategorySentence(category) {
+  const shown = echo(category);
+  return `No providers matched, and ${shown ? `${shown} isn't` : "that category isn't"} one of the directory's 25 category names. Call list_categories for the exact names, then search again with one of them.`;
+}
 
 // C79-a/C79-b (GEN64 ALLOC-PUBLISHED-CLAIMS-G64-20, 2026-09-12). getpracticehelp's `quality_score`
 // is PROFILE COMPLETENESS (presence points for website, phone, description, tags, location, source,
@@ -613,6 +631,18 @@ export function validateArgs(toolName, args) {
       `\n\nThe call was NOT run. Without \`${missing[0]}\` the result would describe the whole directory rather than answer the question.`
     );
   }
+
+  // C2455: a state that is not one of the 50 states or DC (Zxqvland, or the country code US) used
+  // to be forwarded and came back as an empty or national-only list with no reason given. Refuse
+  // it before the call runs, in one sentence that says what to send. A real code in any case and a
+  // full state name pass unchanged, as before.
+  if ((toolName === 'match_practice' || toolName === 'search_providers') && a.state != null && String(a.state).trim() !== '') {
+    const usHint = toolName === 'match_practice'
+      ? 'To search nationally, leave state out and set vendor_geo_preference to NATIONAL_OK.'
+      : 'Leave state out to search every state, since national providers are always included.';
+    const problem = stateProblem(a.state, { usHint, allowNames: true });
+    if (problem) return toolError(problem);
+  }
   return null;
 }
 
@@ -706,7 +736,8 @@ async function callToolRaw(name, args) {
       '',
       'Pass a category name to search_providers or match_practice exactly as written above.',
     ].join('\n');
-    return { content: [{ type: 'text', text }], count: cats.length };
+    return withNote({ content: [{ type: 'text', text }], count: cats.length },
+      cats.length ? null : 'The directory returned no categories just now, so try list_categories again in a minute.');
   }
 
   if (name === 'match_practice') {
@@ -716,9 +747,16 @@ async function callToolRaw(name, args) {
       body: JSON.stringify(args),
     });
     const data = await res.json();
-    if (!data.success) return { content: [{ type: 'text', text: `Match failed: ${data.error || 'Unknown error'}` }], isError: true };
+    if (!data.success) {
+      const failed = { content: [{ type: 'text', text: `Match failed: ${data.error || 'Unknown error'}` }], isError: true };
+      return withNote(failed, categoryLooksUnknown(args?.category) ? unknownCategorySentence(args.category) : null);
+    }
 
     const matches = (data.matches || []).slice(0, 5);
+    // C2455: an unknown category that matched nothing is an error the caller can fix, not an empty answer.
+    if (matches.length === 0 && categoryLooksUnknown(args?.category)) {
+      return { ...toolError(unknownCategorySentence(args.category)), count: 0 };
+    }
     const text = matches.length === 0
       ? 'No matching providers found for your criteria. Try broadening your search (e.g. remove city filter or change category).'
       : matches.map((m, i) => [
@@ -753,7 +791,7 @@ async function callToolRaw(name, args) {
       result.decision_report = dr;
       result.structuredContent = { decision_report: { available: true, what_it_adds: dr.what_it_adds, url: dr.url } };
     }
-    return result;
+    return matches.length === 0 ? withNote(result, matchWidenSentence(args || {})) : result;
   }
 
   if (name === 'search_providers') {
@@ -768,10 +806,15 @@ async function callToolRaw(name, args) {
 
     const res = await fetch(`${API_BASE}/provider/${encodeURIComponent(args.slug)}`);
     // count: 0 so telemetry records the miss as zero_result (D850: drill misses were invisible).
-    if (!res.ok) return { content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true, count: 0 };
+    // C2455: one added sentence. A 404 (or a body with no provider) means the slug does not exist;
+    // any other status means the lookup itself failed, so the caller should retry, not change the slug.
+    const shownSlug = echo(args.slug);
+    const noSuchSlug = `${shownSlug ? `No provider has the slug ${shownSlug}.` : 'No provider has that slug.'} Slugs come from match_practice or search_providers results, so run one of those and pass a slug it returns.`;
+    const notFound = sentence => withNote({ content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true, count: 0 }, sentence);
+    if (!res.ok) return notFound(res.status === 404 ? noSuchSlug : `The provider ${shownSlug ? `${shownSlug} ` : ''}couldn't be loaded just now, so try get_provider_detail again in a minute with the same slug.`);
 
     const data = await res.json();
-    if (!data.success || !data.provider) return { content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true, count: 0 };
+    if (!data.success || !data.provider) return notFound(noSuchSlug);
     const p = data.provider;
     // P2-WIRE: enriched_* first, legacy columns as fallback only.
     const e = resolveEnrichedProfile(p);
@@ -997,7 +1040,39 @@ export function renderSearchResult(args, data) {
       ].filter(Boolean).join('\n')).join('\n\n');
 
   const totalResults = data.pagination?.total ?? data.total ?? providers.length;
-  return { content: [{ type: 'text', text: `${totalResults} total results (page ${args.page || 1}):\n\n${text}` }], count: totalResults, ids: { surfaced: providers.map(p => p.slug).filter(Boolean) } };
+  // C2455: an unknown category that found nothing is an error the caller can fix, not an empty answer.
+  if (providers.length === 0 && !totalResults && categoryLooksUnknown(args.category)) {
+    return { ...toolError(unknownCategorySentence(args.category)), count: 0 };
+  }
+  const result = { content: [{ type: 'text', text: `${totalResults} total results (page ${args.page || 1}):\n\n${text}` }], count: totalResults, ids: { surfaced: providers.map(p => p.slug).filter(Boolean) } };
+  return providers.length === 0 ? withNote(result, searchWidenSentence(args, totalResults)) : result;
+}
+
+// C2455 s.2: one sentence on how to widen a valid query that matched nothing, naming only the
+// filters the caller actually sent. Closed text; the echoed values are the caller's own arguments.
+const SEARCH_NARROWING = ['city', 'min_rating', 'tier1_grade', 'practice_size_fit', 'state'];
+function searchWidenSentence(args, totalResults) {
+  if (totalResults > 0) {
+    return `This page is past the last result, since all ${totalResults} results fit on earlier pages, so ask for page 1.`;
+  }
+  const used = SEARCH_NARROWING.filter(k => args[k] != null && String(args[k]).trim() !== '');
+  if (used.length) {
+    return `Nothing matched with ${andList(used)} set, so try again without ${used.length > 1 ? 'one of them' : 'it'}, starting with ${used[0]}.`;
+  }
+  const shown = echo(args.category);
+  return `${shown ? `No providers are listed under ${shown} right now` : 'No providers are listed under that category right now'}, so call list_categories and try a related category.`;
+}
+
+function matchWidenSentence(args) {
+  const used = ['city', 'specialty', 'practice_size', 'ehr_system', 'budget_range', 'service_needs']
+    .filter(k => Array.isArray(args[k]) ? args[k].length > 0 : args[k] != null && String(args[k]).trim() !== '');
+  if (used.length) {
+    return `Nothing matched with ${andList(used)} set, so try again without ${used.length > 1 ? 'one of them' : 'it'}, starting with ${used[0]}.`;
+  }
+  if (args.vendor_geo_preference !== 'NATIONAL_OK') {
+    return 'Nothing matched in that location, so try again with vendor_geo_preference set to NATIONAL_OK to let national vendors in.';
+  }
+  return 'Nothing matched even with national vendors allowed, so call list_categories and try a related category.';
 }
 
 async function openSearchCache(env) {
