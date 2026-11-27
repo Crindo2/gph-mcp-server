@@ -1,3 +1,4 @@
+import { echo, withNote } from './input-errors.js';
 // C840 s.2 / E8 section 4: read the P1 projection, without a second factual store.
 export const EHR_PRODUCT_TOOL = {
   name: 'get_ehr_product_detail',
@@ -17,12 +18,27 @@ export const EHR_PRODUCT_TOOL = {
 
 const frame = (body, isError = false) => ({ content: [{ type: 'text', text: JSON.stringify(body) }], ...(isError ? { isError: true } : {}) });
 const notFound = () => frame({ schema_version: '1.0.0', error: 'product_not_found' }, true);
+// C2455: each refusal keeps its JSON body in content[0] unchanged and adds one plain sentence
+// saying what was wrong and what to send instead.
+// No tool lists product keys, so the sentence says so and points at the nearest thing that helps.
+const FIND_EHR = 'No tool here lists the keys, so if you need EHR vendors rather than one known product, call search_providers with the category Healthcare IT & EHR.';
+const keyNote = (k) => {
+  const shown = echo(k);
+  if (typeof k !== 'string' || k.trim() === '') return `get_ehr_product_detail needs a product_key, the exact key of one EHR product written in lowercase with hyphens. ${FIND_EHR}`;
+  return `${shown ? shown : 'That value'} is not a product key, because keys use only lowercase letters, numbers and hyphens and aliases aren't accepted. ${FIND_EHR}`;
+};
 export function validateEhrProductArgs(args) {
-  if (!args || typeof args !== 'object' || Array.isArray(args) ||
-      typeof args.product_key !== 'string' || !/^[a-z0-9-]+$/.test(args.product_key) ||
-      (Object.hasOwn(args, 'edition_key') && (typeof args.edition_key !== 'string' || !/^[a-z0-9-]+$/.test(args.edition_key)))) return notFound();
-  if (Object.keys(args).some(k => !['product_key', 'edition_key'].includes(k))) {
-    return frame({ error: 'invalid_arguments' }, true);
+  if (!args || typeof args !== 'object' || Array.isArray(args)) {
+    return withNote(notFound(), `get_ehr_product_detail needs its arguments as an object with a product_key. ${FIND_EHR}`);
+  }
+  if (typeof args.product_key !== 'string' || !/^[a-z0-9-]+$/.test(args.product_key)) return withNote(notFound(), keyNote(args.product_key));
+  if (Object.hasOwn(args, 'edition_key') && (typeof args.edition_key !== 'string' || !/^[a-z0-9-]+$/.test(args.edition_key))) {
+    return withNote(notFound(), 'edition_key has to be an exact edition key in lowercase letters, numbers and hyphens, so leave it out to get the product with all its recorded editions.');
+  }
+  const extra = Object.keys(args).filter(k => !['product_key', 'edition_key'].includes(k));
+  if (extra.length) {
+    const shown = echo(extra[0]);
+    return withNote(frame({ error: 'invalid_arguments' }, true), `${shown ? shown : 'That argument'} is not a parameter of get_ehr_product_detail, which takes product_key and an optional edition_key.`);
   }
   return null;
 }
@@ -38,9 +54,11 @@ export async function ehrProductDetail(args) {
     if (response.status >= 300 && response.status < 400) return frame({ error: 'product_upstream_error' }, true);
     if (!response.ok && response.status !== 404) return frame({ error: 'product_upstream_error' }, true);
     const body = await response.json();
-    if (response.status === 404) return frame(body, true);
+    if (response.status === 404) return withNote(frame(body, true), `No EHR product has the key ${echo(args.product_key) || 'you sent'}. Keys must match exactly and aliases aren't accepted. ${FIND_EHR}`);
     if (args.edition_key !== undefined && !body.product?.editions?.some(e =>
-      e.product_key === args.product_key && e.edition_key === args.edition_key)) return notFound();
+      e.product_key === args.product_key && e.edition_key === args.edition_key)) {
+      return withNote(notFound(), `${echo(args.product_key) || 'This product'} has no edition with the key ${echo(args.edition_key) || 'you sent'}, so leave edition_key out to get the product with all its recorded editions.`);
+    }
     return frame(body);
   } catch {
     return frame({ error: 'product_upstream_unavailable' }, true);
