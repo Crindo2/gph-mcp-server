@@ -68,3 +68,10 @@ export function andList(items) {
   if (items.length <= 1) return items.join('');
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
+
+// Error replies: put the one actionable sentence FIRST as content[0], then keep any JSON error body
+// after it, so a client that reads only the first block still sees what to do next.
+export function sentenceFirst(result, sentence) {
+  if (!sentence) return result;
+  return { ...result, content: [{ type: 'text', text: sentence }, ...result.content] };
+}

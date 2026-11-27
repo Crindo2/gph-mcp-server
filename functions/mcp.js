@@ -23,7 +23,7 @@ import {
 import { EHR_PRODUCT_TOOL, ehrProductDetail, validateEhrProductArgs } from './_shared/ehr-product-detail.js';
 import { withAttribution } from './_shared/attribution.js';
 import { PRACTICE_DATA_COUNTS_TOOL, practiceDataCounts, validatePracticeDataCountsArgs } from './_shared/practice-data-counts.js';
-import { echo, stateProblem, withNote, andList } from './_shared/input-errors.js';
+import { echo, stateProblem, withNote, sentenceFirst, andList } from './_shared/input-errors.js';
 
 const API_BASE = 'https://www.getpracticehelp.com/api';
 const AT_BASE = 'appvHqDMSu6aCwNxA';
@@ -374,26 +374,6 @@ export const TOOLS = [
         { required: ['vendor_geo_preference'], properties: { vendor_geo_preference: { enum: [...STATE_OPTIONAL_PREFERENCES] } } },
       ],
     },
-    // outputSchema (task #12 rider, 2026-07-03): documents the EXISTING result shape
-    // callTool() already returns below -- additive metadata only, no behavior change.
-    // See DESIGN-NOTE-task12-category-normalization-2026-07-03.md Section 6.
-    outputSchema: {
-      type: 'object',
-      properties: {
-        content: {
-          type: 'array',
-          items: { type: 'object', properties: { type: { const: 'text' }, text: { type: 'string' } }, required: ['type', 'text'] },
-        },
-        isError: { type: 'boolean', description: 'Present and true only on failure (match request error or no candidates).' },
-        count: { type: 'integer', description: 'Total scored candidates before the top-5 slice; absent when isError.' },
-        ids: {
-          type: 'object',
-          properties: { surfaced: { type: 'array', items: { type: 'string' }, description: 'Provider slugs shown, in ranked order.' } },
-          description: 'Absent when isError.',
-        },
-      },
-      required: ['content'],
-    },
   },
   {
     name: 'search_providers',
@@ -417,26 +397,6 @@ export const TOOLS = [
       },
       required: ['category'],
     },
-    // outputSchema (task #12 rider, 2026-07-03): documents the EXISTING result shape
-    // callTool() already returns below -- additive metadata only, no behavior change.
-    // See DESIGN-NOTE-task12-category-normalization-2026-07-03.md Section 6.
-    outputSchema: {
-      type: 'object',
-      properties: {
-        content: {
-          type: 'array',
-          items: { type: 'object', properties: { type: { const: 'text' }, text: { type: 'string' } }, required: ['type', 'text'] },
-        },
-        isError: { type: 'boolean', description: 'Present and true only on failure.' },
-        count: { type: 'integer', description: 'Total matching providers across all pages; absent when isError.' },
-        ids: {
-          type: 'object',
-          properties: { surfaced: { type: 'array', items: { type: 'string' }, description: 'Provider slugs on this page, in returned order.' } },
-          description: 'Absent when isError.',
-        },
-      },
-      required: ['content'],
-    },
   },
   {
     name: 'get_provider_detail',
@@ -450,26 +410,6 @@ export const TOOLS = [
       },
       required: ['slug'],
     },
-    // outputSchema (task #12 rider, 2026-07-03): documents the EXISTING result shape
-    // callTool() already returns below -- additive metadata only, no behavior change.
-    // See DESIGN-NOTE-task12-category-normalization-2026-07-03.md Section 6.
-    outputSchema: {
-      type: 'object',
-      properties: {
-        content: {
-          type: 'array',
-          items: { type: 'object', properties: { type: { const: 'text' }, text: { type: 'string' } }, required: ['type', 'text'] },
-        },
-        isError: { type: 'boolean', description: 'Present and true only when the slug is unknown or the fetch fails.' },
-        count: { const: 1, description: 'Always 1 on success; absent when isError.' },
-        ids: {
-          type: 'object',
-          properties: { drilled: { type: 'string', description: 'The slug that was looked up.' } },
-          description: 'Absent when isError.',
-        },
-      },
-      required: ['content'],
-    },
   },
   {
     // GPH-MCP-SCHEMA-FIX-01 S2 (2026-08-02). The discovery affordance. Before this tool the
@@ -482,18 +422,6 @@ export const TOOLS = [
     description: `List every service category in the GPH vendor directory with its live provider count. Call this FIRST when you do not already know which category fits the user's need, when a category search returned nothing, or when the user asks what kinds of vendors are available. Returns all 25 categories with {category, slug, providers}. The category names returned here are the exact values match_practice and search_providers expect (common aliases also resolve). Takes no arguments.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: { type: 'object', properties: {}, required: [] },
-    outputSchema: {
-      type: 'object',
-      properties: {
-        content: {
-          type: 'array',
-          items: { type: 'object', properties: { type: { const: 'text' }, text: { type: 'string' } }, required: ['type', 'text'] },
-        },
-        isError: { type: 'boolean', description: 'Present and true only on failure.' },
-        count: { type: 'integer', description: 'Number of categories returned; absent when isError.' },
-      },
-      required: ['content'],
-    },
   },
   EHR_PRODUCT_TOOL,
   PRACTICE_DATA_COUNTS_TOOL,
@@ -632,6 +560,15 @@ export function validateArgs(toolName, args) {
     );
   }
 
+  // Item 20 (C2456): per_page outside 1 to 25, or not a whole number, used to be swallowed and
+  // replaced by the default. Refuse it before the call runs and say what range is allowed.
+  if (toolName === 'search_providers' && a.per_page != null) {
+    const pp = a.per_page;
+    if (typeof pp !== 'number' || !Number.isInteger(pp) || pp < 1 || pp > 25) {
+      return toolError('per_page has to be a whole number from 1 to 25, so send a value in that range or leave it out to get 10 results. The call was NOT run.');
+    }
+  }
+
   // C2455: a state that is not one of the 50 states or DC (Zxqvland, or the country code US) used
   // to be forwarded and came back as an empty or national-only list with no reason given. Refuse
   // it before the call runs, in one sentence that says what to send. A real code in any case and a
@@ -640,7 +577,7 @@ export function validateArgs(toolName, args) {
     const usHint = toolName === 'match_practice'
       ? 'To search nationally, leave state out and set vendor_geo_preference to NATIONAL_OK.'
       : 'Leave state out to search every state, since national providers are always included.';
-    const problem = stateProblem(a.state, { usHint, allowNames: true });
+    const problem = stateProblem(a.state, { usHint, allowNames: toolName !== 'match_practice' });
     if (problem) return toolError(problem);
   }
   return null;
@@ -810,7 +747,7 @@ async function callToolRaw(name, args) {
     // any other status means the lookup itself failed, so the caller should retry, not change the slug.
     const shownSlug = echo(args.slug);
     const noSuchSlug = `${shownSlug ? `No provider has the slug ${shownSlug}.` : 'No provider has that slug.'} Slugs come from match_practice or search_providers results, so run one of those and pass a slug it returns.`;
-    const notFound = sentence => withNote({ content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true, count: 0 }, sentence);
+    const notFound = sentence => sentenceFirst({ content: [{ type: 'text', text: `Provider not found: ${args.slug}` }], isError: true, count: 0 }, sentence);
     if (!res.ok) return notFound(res.status === 404 ? noSuchSlug : `The provider ${shownSlug ? `${shownSlug} ` : ''}couldn't be loaded just now, so try get_provider_detail again in a minute with the same slug.`);
 
     const data = await res.json();
@@ -892,7 +829,7 @@ async function callToolRaw(name, args) {
     return { content: [{ type: 'text', text }], count: 1, ids: { drilled: args.slug || '' } };
   }
 
-  return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true };
+  return { content: [{ type: 'text', text: `Unknown tool: ${name}. The six tools are match_practice, search_providers, get_provider_detail, list_categories, get_ehr_product_detail and practice_data_counts, so call tools/list to see them and send one of those names.` }], isError: true };
 }
 
 // ── search_providers read cache (GPH-MCP-SERVING-01 M1-SERVING-BUILD; C161 s.2 as amended by
@@ -1035,6 +972,7 @@ export function renderSearchResult(args, data) {
         `${i + 1}. **${p.company_name}**, ${p.city || 'National'}, ${p.state_abbr || 'US'}`,
         `   Profile Completeness: ${profileCompletenessText(p.quality_score)}`,
         `   Category: ${p.category}`,
+        p.slug ? `   Slug: ${p.slug}` : '',
         p.phone ? `   Phone: ${p.phone}` : '',
         p.website ? `   Website: ${p.website}` : '',
       ].filter(Boolean).join('\n')).join('\n\n');

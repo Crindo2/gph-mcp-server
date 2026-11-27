@@ -33,26 +33,6 @@ export const TOOLS = [
         { required: ['vendor_geo_preference'], properties: { vendor_geo_preference: { enum: [...STATE_OPTIONAL_PREFERENCES] } } },
       ],
     },
-    // outputSchema (task #12 rider, 2026-07-03): documents the EXISTING result shape
-    // callTool() already returns below -- additive metadata only, no behavior change.
-    // See DESIGN-NOTE-task12-category-normalization-2026-07-03.md Section 6.
-    outputSchema: {
-      type: 'object',
-      properties: {
-        content: {
-          type: 'array',
-          items: { type: 'object', properties: { type: { const: 'text' }, text: { type: 'string' } }, required: ['type', 'text'] },
-        },
-        isError: { type: 'boolean', description: 'Present and true only on failure (match request error or no candidates).' },
-        count: { type: 'integer', description: 'Total scored candidates before the top-5 slice; absent when isError.' },
-        ids: {
-          type: 'object',
-          properties: { surfaced: { type: 'array', items: { type: 'string' }, description: 'Provider slugs shown, in ranked order.' } },
-          description: 'Absent when isError.',
-        },
-      },
-      required: ['content'],
-    },
   },
   {
     name: 'search_providers',
@@ -76,26 +56,6 @@ export const TOOLS = [
       },
       required: ['category'],
     },
-    // outputSchema (task #12 rider, 2026-07-03): documents the EXISTING result shape
-    // callTool() already returns below -- additive metadata only, no behavior change.
-    // See DESIGN-NOTE-task12-category-normalization-2026-07-03.md Section 6.
-    outputSchema: {
-      type: 'object',
-      properties: {
-        content: {
-          type: 'array',
-          items: { type: 'object', properties: { type: { const: 'text' }, text: { type: 'string' } }, required: ['type', 'text'] },
-        },
-        isError: { type: 'boolean', description: 'Present and true only on failure.' },
-        count: { type: 'integer', description: 'Total matching providers across all pages; absent when isError.' },
-        ids: {
-          type: 'object',
-          properties: { surfaced: { type: 'array', items: { type: 'string' }, description: 'Provider slugs on this page, in returned order.' } },
-          description: 'Absent when isError.',
-        },
-      },
-      required: ['content'],
-    },
   },
   {
     name: 'get_provider_detail',
@@ -109,26 +69,6 @@ export const TOOLS = [
       },
       required: ['slug'],
     },
-    // outputSchema (task #12 rider, 2026-07-03): documents the EXISTING result shape
-    // callTool() already returns below -- additive metadata only, no behavior change.
-    // See DESIGN-NOTE-task12-category-normalization-2026-07-03.md Section 6.
-    outputSchema: {
-      type: 'object',
-      properties: {
-        content: {
-          type: 'array',
-          items: { type: 'object', properties: { type: { const: 'text' }, text: { type: 'string' } }, required: ['type', 'text'] },
-        },
-        isError: { type: 'boolean', description: 'Present and true only when the slug is unknown or the fetch fails.' },
-        count: { const: 1, description: 'Always 1 on success; absent when isError.' },
-        ids: {
-          type: 'object',
-          properties: { drilled: { type: 'string', description: 'The slug that was looked up.' } },
-          description: 'Absent when isError.',
-        },
-      },
-      required: ['content'],
-    },
   },
   {
     // GPH-MCP-SCHEMA-FIX-01 S2 (2026-08-02). The discovery affordance. Before this tool the
@@ -141,17 +81,5 @@ export const TOOLS = [
     description: `List every service category in the GPH vendor directory with its live provider count. Call this FIRST when you do not already know which category fits the user's need, when a category search returned nothing, or when the user asks what kinds of vendors are available. Returns all 25 categories with {category, slug, providers}. The category names returned here are the exact values match_practice and search_providers expect (common aliases also resolve). Takes no arguments.`,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false, destructiveHint: false },
     inputSchema: { type: 'object', properties: {}, required: [] },
-    outputSchema: {
-      type: 'object',
-      properties: {
-        content: {
-          type: 'array',
-          items: { type: 'object', properties: { type: { const: 'text' }, text: { type: 'string' } }, required: ['type', 'text'] },
-        },
-        isError: { type: 'boolean', description: 'Present and true only on failure.' },
-        count: { type: 'integer', description: 'Number of categories returned; absent when isError.' },
-      },
-      required: ['content'],
-    },
   },
 ];

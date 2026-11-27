@@ -5,7 +5,8 @@ const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
 const URL0 = 'https://www.getpracticehelp.com/data/api/counts';
 const invoke = args => callTool('practice_data_counts', args);
-const body = r => JSON.parse(r.content[0].text);
+// Item 18 (C2456): an error reply leads with its sentence, so read the first block that is JSON.
+const body = r => JSON.parse(r.content.find(c => c.text.trimStart().startsWith('{')).text);
 // Synthetic shape fixture, not a production observation.
 const fixture = { schema_version: 1, as_of: '2026-11-04', unit: 'practices (headline evidence)', min_cell: 25,
   states: [{ state: 'TX', segments: [

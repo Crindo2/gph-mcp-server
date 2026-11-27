@@ -8,7 +8,8 @@ const fixture = JSON.parse(read('ehr-product-detail.json'));
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
 const invoke = args => callTool('get_ehr_product_detail', args);
-const body = result => JSON.parse(result.content[0].text);
+// Item 18 (C2456): an error reply leads with its sentence, so read the first block that is JSON.
+const body = result => JSON.parse(result.content.find(c => c.text.trimStart().startsWith('{')).text);
 const notFound = { schema_version: '1.0.0', error: 'product_not_found' };
 function mock(data = fixture, status = 200) {
   const calls = [];

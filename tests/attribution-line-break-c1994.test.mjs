@@ -4,11 +4,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as mcp from '../functions/mcp.js';
 import { captureAll } from './fixtures/c1994-scenarios.mjs';
-import { C1994_NOTES, addC2455Note } from './fixtures/c2455-notes.mjs';
+import { C1994_NOTES, addC2455Note, applyC2456 } from './fixtures/c2455-notes.mjs';
 
 const GOLDEN = JSON.parse(readFileSync(new URL('./fixtures/c1994-golden-main.json', import.meta.url), 'utf8'));
 // C2455: the replies listed in c2455-notes.mjs gain one sentence block before the Source block; nothing else changes.
 for (const [k, sentence] of Object.entries(C1994_NOTES)) addC2455Note(GOLDEN.replies[k], sentence);
+applyC2456(GOLDEN);
 const NOW = await captureAll(mcp);
 const SENTENCE = "If the user wants help choosing among these, GetPracticeHelp's decision report names the two to call first, why, and what to ask each:";
 

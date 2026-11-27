@@ -25,7 +25,8 @@ async function run(tool, args) {
   return r;
 }
 // The plain sentence C2455 adds is always the last text block before any Source block.
-const note = r => r.content.filter(c => !/^(\n\n)?Source: /.test(c.text)).at(-1).text;
+// Item 18 (C2456): on an error reply the sentence is content[0]; any JSON body follows it.
+const note = r => r.isError ? r.content[0].text : r.content.filter(c => !/^(\n\n)?Source: /.test(c.text)).at(-1).text;
 const refused = (r, re) => {
   assert.equal(r.isError, true);
   assert.match(note(r), re);
@@ -50,7 +51,7 @@ test('match_practice: a two-letter code that is not a state is refused', async (
   refused(await run('match_practice', { category: 'Medical Billing & RCM', state: 'ZZ' }), /^ZZ is not a US state code\./);
 });
 test('match_practice: real codes in any case and full state names still run unchanged', async () => {
-  for (const state of ['TX', 'tx', 'Texas', 'DC']) {
+  for (const state of ['TX', 'tx', 'DC']) {
     mock(() => ({ body: { success: true, total: 1, matches: [P(1)] } }));
     const r = await run('match_practice', { category: 'Medical Billing & RCM', state });
     assert.equal(r.isError, undefined, state);
@@ -136,7 +137,7 @@ test('get_provider_detail: a slug that does not exist is an error that says wher
   const r = await run('get_provider_detail', { slug: 'zxqv-no-such-firm' });
   assert.equal(r.isError, true);
   assert.equal(r.count, 0);
-  assert.equal(r.content[0].text, 'Provider not found: zxqv-no-such-firm');
+  assert.equal(r.content[1].text, 'Provider not found: zxqv-no-such-firm');
   assert.equal(note(r), 'No provider has the slug zxqv-no-such-firm. Slugs come from match_practice or search_providers results, so run one of those and pass a slug it returns.');
 });
 test('get_provider_detail: a 200 body with no provider reads the same as a missing slug', async () => {
@@ -170,7 +171,7 @@ test('list_categories: an empty list stays a result and says to try again', asyn
 
 // -- get_ehr_product_detail --
 const ehrMissing = () => ({ status: 404, body: { schema_version: '1.0.0', error: 'product_not_found' } });
-const ehrBody = r => JSON.parse(r.content[0].text);
+const ehrBody = r => JSON.parse(r.content[1].text);
 for (const key of ['test', 'zxqv-8812-nonexistent']) {
   test(`get_ehr_product_detail: product_key ${key} that does not exist keeps its JSON and adds a sentence`, async () => {
     mock(ehrMissing);
@@ -197,7 +198,7 @@ test('get_ehr_product_detail: an edition that is not under the product says to l
 
 // -- practice_data_counts --
 const counts = (segments = []) => ({ body: { schema_version: 1, as_of: '2026-11-04', unit: 'practices (headline evidence)', min_cell: 25, states: [{ state: 'TX', segments }] } });
-const invalidBody = r => assert.deepEqual(JSON.parse(r.content[0].text), { error: 'invalid_arguments' });
+const invalidBody = r => assert.deepEqual(JSON.parse(r.content[1].text), { error: 'invalid_arguments' });
 test('practice_data_counts: a state that is not a US state is refused with one sentence', async () => {
   mock(counts);
   const r = await run('practice_data_counts', { state: 'Zxqvland' });
@@ -243,4 +244,48 @@ after(() => {
     assert.equal(/[\u2013\u2014]/.test(t), false, `en or em dash in: ${t}`);
   }
   assert.ok(SEEN.length > 40);
+});
+
+// -- C2456 fixes --
+test('match_practice: a full state name is refused with the code to send (item 21)', async () => {
+  mock(matchEmpty);
+  refused(await run('match_practice', { category: 'Medical Billing & RCM', state: 'Texas' }), /^Texas is a state name, and this tool takes the two-letter code, so send TX instead\.$/);
+});
+test('search_providers: per_page of 0, text, a fraction or over 25 is refused with the allowed range (item 20)', async () => {
+  for (const per_page of [0, 26, 2.5, 'ten', -1]) {
+    mock(searchEmpty);
+    refused(await run('search_providers', { category: 'Medical Billing & RCM', per_page }), /^per_page has to be a whole number from 1 to 25/);
+  }
+  mock(() => ({ body: { success: true, providers: [P(1)], pagination: { total: 1 } } }));
+  for (const per_page of [1, 25]) assert.equal((await run('search_providers', { category: 'Medical Billing & RCM', per_page })).isError, undefined);
+});
+test('search_providers: each row names its slug (item 10)', async () => {
+  mock(() => ({ body: { success: true, providers: [P(1), P(2)], pagination: { total: 2 } } }));
+  const r = await run('search_providers', { category: 'Medical Billing & RCM', state: 'TX' });
+  assert.match(r.content[0].text, /Slug: fixture-1\n/);
+  assert.match(r.content[0].text, /Slug: fixture-2/);
+});
+test('item 22: no tool declares an outputSchema', async () => {
+  const { TOOLS } = await import('../functions/mcp.js');
+  for (const t of TOOLS) assert.equal(t.outputSchema, undefined, t.name);
+});
+test('item 18: the unknown tool says which six exist and to call tools/list', async () => {
+  mock(searchEmpty);
+  const r = (await serveTool('no_such_tool', {})).result;
+  assert.equal(r.isError, true);
+  assert.match(r.content[0].text, /^Unknown tool: no_such_tool\. The six tools are match_practice, .*practice_data_counts, so call tools\/list/);
+});
+test('item 18: every bad-input error leads with its sentence', async () => {
+  mock(() => ({ status: 404, body: {} }));
+  const cases = [
+    ['get_provider_detail', { slug: 'zxqv' }, /^No provider has the slug zxqv\./],
+    ['practice_data_counts', { state: 'Texas' }, /^Texas is a state name/],
+    ['practice_data_counts', { segment: 'nope' }, /^nope is not one of the practice segments/],
+    ['get_ehr_product_detail', {}, /^get_ehr_product_detail needs a product_key/],
+  ];
+  for (const [tool, args, re] of cases) {
+    const r = await run(tool, args);
+    assert.equal(r.isError, true);
+    assert.match(r.content[0].text, re, tool);
+  }
 });
