@@ -1,4 +1,4 @@
-import { echo, withNote } from './input-errors.js';
+import { echo, sentenceFirst } from './input-errors.js';
 // C840 s.2 / E8 section 4: read the P1 projection, without a second factual store.
 export const EHR_PRODUCT_TOOL = {
   name: 'get_ehr_product_detail',
@@ -29,16 +29,16 @@ const keyNote = (k) => {
 };
 export function validateEhrProductArgs(args) {
   if (!args || typeof args !== 'object' || Array.isArray(args)) {
-    return withNote(notFound(), `get_ehr_product_detail needs its arguments as an object with a product_key. ${FIND_EHR}`);
+    return sentenceFirst(notFound(), `get_ehr_product_detail needs its arguments as an object with a product_key. ${FIND_EHR}`);
   }
-  if (typeof args.product_key !== 'string' || !/^[a-z0-9-]+$/.test(args.product_key)) return withNote(notFound(), keyNote(args.product_key));
+  if (typeof args.product_key !== 'string' || !/^[a-z0-9-]+$/.test(args.product_key)) return sentenceFirst(notFound(), keyNote(args.product_key));
   if (Object.hasOwn(args, 'edition_key') && (typeof args.edition_key !== 'string' || !/^[a-z0-9-]+$/.test(args.edition_key))) {
-    return withNote(notFound(), 'edition_key has to be an exact edition key in lowercase letters, numbers and hyphens, so leave it out to get the product with all its recorded editions.');
+    return sentenceFirst(notFound(), 'edition_key has to be an exact edition key in lowercase letters, numbers and hyphens, so leave it out to get the product with all its recorded editions.');
   }
   const extra = Object.keys(args).filter(k => !['product_key', 'edition_key'].includes(k));
   if (extra.length) {
     const shown = echo(extra[0]);
-    return withNote(frame({ error: 'invalid_arguments' }, true), `${shown ? shown : 'That argument'} is not a parameter of get_ehr_product_detail, which takes product_key and an optional edition_key.`);
+    return sentenceFirst(frame({ error: 'invalid_arguments' }, true), `${shown ? shown : 'That argument'} is not a parameter of get_ehr_product_detail, which takes product_key and an optional edition_key.`);
   }
   return null;
 }
@@ -54,10 +54,10 @@ export async function ehrProductDetail(args) {
     if (response.status >= 300 && response.status < 400) return frame({ error: 'product_upstream_error' }, true);
     if (!response.ok && response.status !== 404) return frame({ error: 'product_upstream_error' }, true);
     const body = await response.json();
-    if (response.status === 404) return withNote(frame(body, true), `No EHR product has the key ${echo(args.product_key) || 'you sent'}. Keys must match exactly and aliases aren't accepted. ${FIND_EHR}`);
+    if (response.status === 404) return sentenceFirst(frame(body, true), `No EHR product has the key ${echo(args.product_key) || 'you sent'}. Keys must match exactly and aliases aren't accepted. ${FIND_EHR}`);
     if (args.edition_key !== undefined && !body.product?.editions?.some(e =>
       e.product_key === args.product_key && e.edition_key === args.edition_key)) {
-      return withNote(notFound(), `${echo(args.product_key) || 'This product'} has no edition with the key ${echo(args.edition_key) || 'you sent'}, so leave edition_key out to get the product with all its recorded editions.`);
+      return sentenceFirst(notFound(), `${echo(args.product_key) || 'This product'} has no edition with the key ${echo(args.edition_key) || 'you sent'}, so leave edition_key out to get the product with all its recorded editions.`);
     }
     return frame(body);
   } catch {

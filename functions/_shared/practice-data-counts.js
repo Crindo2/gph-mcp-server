@@ -1,4 +1,4 @@
-import { echo, stateProblem, withNote } from './input-errors.js';
+import { echo, stateProblem, withNote, sentenceFirst } from './input-errors.js';
 export const PRACTICE_DATA_SEGMENTS = Object.freeze(['primary-care', 'dental', 'pt-ot-speech', 'specialty-clinics', 'behavioral-health', 'derm-peds-vision-podiatry']);
 // C1471 s.4.2: aggregate practice counts by US state and segment. Reads the public JSON endpoint only.
 export const PRACTICE_DATA_COUNTS_TOOL = {
@@ -31,7 +31,7 @@ export function publishedCellCount(body) {
 // sentence. A two-letter code that is not a state (such as US) is now refused too; before, it
 // matched the pattern and came back as an empty count with no reason given.
 const SEGMENT_TEXT = 'primary-care, dental, pt-ot-speech, specialty-clinics, behavioral-health or derm-peds-vision-podiatry';
-const invalid = sentence => withNote(frame({ error: 'invalid_arguments' }, true), sentence);
+const invalid = sentence => sentenceFirst(frame({ error: 'invalid_arguments' }, true), sentence);
 export function validatePracticeDataCountsArgs(args) {
   const a = args === undefined || args === null ? {} : args;
   if (typeof a !== 'object' || Array.isArray(a)) {

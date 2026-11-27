@@ -18,8 +18,22 @@ export const C1984_NOTES = Object.freeze({
 export function addC2455Note(reply, sentence) {
   if (!sentence || !reply || !Array.isArray(reply.content)) return reply;
   const block = { type: 'text', text: sentence };
+  // C2456 item 18: on an error reply the sentence comes first, ahead of any bare error or JSON body.
+  if (reply.isError) { reply.content.unshift(block); return reply; }
   const last = reply.content.at(-1);
   if (last && /^(\n\n)?Source: /.test(last.text)) reply.content.splice(reply.content.length - 1, 0, block);
   else reply.content.push(block);
   return reply;
+}
+
+// C2456: the golden is main's reply; two later changes touch it. outputSchema is gone from the tool
+// list (item 22), and each search_providers row gains a "Slug:" line after its Category line (item 10).
+export function applyC2456(golden) {
+  for (const t of golden.tools_list) delete t.outputSchema;
+  for (const [k, r] of Object.entries(golden.replies)) {
+    if (!k.startsWith('search_providers/search_ok') || !r.ids) continue;
+    const slugs = [...r.ids.surfaced];
+    r.content[0].text = r.content[0].text.replace(/(   Category: [^\n]*)/g, (m) => `${m}\n   Slug: ${slugs.shift()}`);
+  }
+  return golden;
 }

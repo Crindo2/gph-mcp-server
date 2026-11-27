@@ -431,7 +431,7 @@ test('tools/list: page stays uncapped, count stays declared, per_page ceiling un
   assert.equal(sp.inputSchema.properties.page.maximum, undefined, 'no page cap');
   assert.equal(sp.inputSchema.properties.page.minimum, 1);
   assert.equal(sp.inputSchema.properties.per_page.maximum, 25);
-  assert.ok(sp.outputSchema.properties.count);
+  assert.equal(sp.outputSchema, undefined); // item 22 (C2456): no outputSchema declared
   assert.equal(TOOLS.length, 6); // C840 P2 adds the read-only product tool; C1471 adds practice_data_counts.
 });
 
