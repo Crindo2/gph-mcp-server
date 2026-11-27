@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy &mdash; GPH Intelligence MCP Server</title>
+  <title>Privacy Policy for GPH Intelligence MCP Server</title>
   <meta name="description" content="Privacy policy for the GPH Intelligence MCP Server: what data the MCP service collects, how it is used, stored, and retained.">
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 720px; margin: 60px auto; padding: 0 20px; color: #1E293B; line-height: 1.65; }
@@ -17,33 +17,33 @@
 </head>
 <body>
   <h1>Privacy Policy</h1>
-  <p class="meta"><strong>GPH Intelligence MCP Server</strong> &middot; Last updated: 2026-11-26 &middot; Operated by CBEG Group LLC &middot; Contact: <a href="mailto:cbeggroup@gmail.com">cbeggroup@gmail.com</a></p>
+  <p class="meta"><strong>GPH Intelligence MCP Server</strong> &middot; Last updated: 2026-11-27 &middot; Operated by CBEG Group LLC &middot; Contact: <a href="mailto:cbeggroup@gmail.com">cbeggroup@gmail.com</a></p>
 
   <p>This policy describes how the GPH Intelligence MCP Server (<code>https://gph-mcp-server.pages.dev/mcp</code>) handles data. It covers the MCP service's data handling, not the contents of the underlying vendor directory.</p>
 
   <h2>What we collect</h2>
-  <p>Each time one of our tools is called, we write a usage record. Here is what it holds, with the reason for each part.</p>
+  <p>Each time one of our tools is called, we write a usage record containing the following.</p>
   <ul>
     <li>The name of the tool, the time of the call, and the arguments sent exactly as they arrived, such as the service category, specialty, practice size, city, state, EHR system, budget range, search filters, a provider slug or an EHR product key. We copy the most useful of those arguments into columns of their own so we can count demand by category and place.</li>
     <li>What came back: how many results there were, whether there were none, the identifiers of the providers shown, and the provider profile opened, if any. That is how we see which vendors practices actually look at.</li>
     <li>A few labels we work out from the tool name and arguments, so we can read demand without rereading every record. They say how complete the request was (a signal score from 0 to 3 and a completeness figure from 0 to 100), which category and place it asked about, whether it looks like a practice's own question or a bulk read of the directory, which step of a search it was, and whether the answer came from our short-lived search cache.</li>
-    <li>The user-agent string the calling software sends, which names the program making the call.</li>
-    <li>The referring page, when the client sends one.</li>
-    <li>The country and network operator of the calling service, meaning its autonomous system number and the organization that runs that network. Our hosting provider, Cloudflare, derives them from the IP address, and we use them to tell automated crawlers from assistants.</li>
+    <li>The user-agent string the calling software sends, which names the program making the call. We keep it to see which programs send calls and how they behave.</li>
+    <li>The referring page, when the client sends one. We keep it to see which pages send people to the tools.</li>
+    <li>The country and network operator of the calling service, meaning its autonomous system number and the organization that runs that network. Our hosting provider, Cloudflare, derives them from the IP address. We record them for traffic measurement only, and they play no part in how a call is classified or answered.</li>
     <li>Our own classification of the caller, made from the user-agent string and, for a browser client, the website the request came from. It records what kind of caller it is (an AI assistant, a developer tool or a crawler, for example), which assistant or agent it appears to be, what it seems to be doing, and whether it is one of our own test tools. We keep the labels and not the website address.</li>
     <li>A session identifier, so calls made together can be read together. When the client sends back the MCP session id we issued at the start of the session, we store a shortened one-way hash of it, which links the calls in that session and nothing more. When it doesn't, we store a one-way hash of the IP address and user agent mixed with a value that changes every day, so those calls can only be linked within one day.</li>
-    <li>Whether the call was anonymous or used a legacy API key, and for a key, only its plan tier.</li>
+    <li>Whether the call was anonymous or used a legacy API key, and for a key, only its plan tier. We keep the tier to see demand by plan; the key itself is never stored in the usage record.</li>
   </ul>
-  <p>When a caller goes over the rate limit, the first refused call in each window is recorded the same way. A legacy API key also has its call count and last-used time updated, and for a pay-as-you-go key we send a usage event with the key holder's billing customer id to Stripe, our payment processor. We receive your IP address from the network connection and use it only for rate limiting and as a passing input to the daily session hash above. Your raw IP address is never written to either store.</p>
+  <p>When a caller goes over the rate limit, the first refused call in each window is written to our Cloudflare D1 log only. It does not go to Airtable. A legacy API key also has its call count and last-used time updated. For a pay-as-you-go key, we send a usage event with the key holder's billing customer id to Stripe, our payment processor. If that event fails, we keep the billing customer id in a retry queue for up to 7 days and then delete it. We receive your IP address from the network connection and use it only for rate limiting and as a passing input to the daily session hash above. Your raw IP address is never written to either store.</p>
 
   <h2>How we use it</h2>
-  <p>To operate the service and return results; to enforce a request-rate safety valve (per-IP calls per minute, with a daily backstop); and to produce aggregate demand analytics &mdash; which categories, specialties, and locations practices ask about, and how that demand arrives &mdash; that help us improve the directory and prioritize vendor coverage.</p>
+  <p>To operate the service and return results; to enforce a request-rate safety valve (per-IP calls per minute, with a daily backstop); and to produce aggregate demand analytics on which categories, specialties, and locations practices ask about and how that demand arrives. Those analytics help us improve the directory and prioritize vendor coverage.</p>
 
   <h2>Storage and processors</h2>
-  <p>Usage records are stored in Cloudflare D1, our hosting provider's own database, and copied to Airtable, our data processor, for review. They hold the call details listed above and never your IP address or an account identity. Your IP address is held only as part of the key for two rate-limit counters in Cloudflare KV: a per-minute counter, which expires automatically after 2 minutes, and a per-day counter, which expires automatically after 48 hours. The same counters are held briefly in the memory of the server instance handling your calls. Directory search results are cached for up to an hour so repeated searches come back faster, and that cache holds only the directory's answer, with nothing about who asked.</p>
+  <p>Usage records are stored in Cloudflare D1, our hosting provider's own database. Airtable, our data processor, receives a copy for review, except for rate-limit refusal records. Two fields, traffic class and cache status, stay in D1 only. The arguments as sent are copied to Airtable in its raw-argument field, so when a caller supplies a vendor geography preference or service needs, those values reach Airtable as well. Neither store holds your IP address or an account identity. Your IP address is held only as part of the key for two rate-limit counters in Cloudflare KV: a per-minute counter, which expires automatically after 2 minutes, and a per-day counter, which expires automatically after 48 hours. The same counters are held briefly in the memory of the server instance handling your calls. Directory search results are cached for up to an hour so repeated searches come back faster, and that cache holds only the directory's answer, with nothing about who asked.</p>
 
   <h2>Retention</h2>
-  <p>Individual usage records are retained for service-improvement analytics in Cloudflare D1 and Airtable for up to 24 months, after which they are deleted; aggregate, de-identified demand statistics derived from them may be kept indefinitely. Rate-limit counters expire automatically after 48 hours.</p>
+  <p>Individual usage records are retained for service-improvement analytics in Cloudflare D1 and Airtable for up to 24 months, after which they are deleted; aggregate, de-identified demand statistics derived from them may be kept indefinitely. Rate-limit counters expire automatically after 48 hours. Stripe retry entries for failed usage events are kept for up to 7 days and then deleted.</p>
 
   <h2>Sharing</h2>
   <p>We use Cloudflare as our hosting and infrastructure provider, including the D1 database, and Airtable as a processor. Stripe receives usage events only for pay-as-you-go API keys, so it can bill them. We use aggregate, non-identifying demand insights to inform vendor and sponsor outreach. We do not sell or share the query or demand data.</p>
