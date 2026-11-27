@@ -136,7 +136,7 @@ Each tool call writes one usage record to Cloudflare D1. Airtable receives a cop
 - **Provider Directory:** [getpracticehelp.com/providers/](https://www.getpracticehelp.com/providers/)
 - **Smithery:** [smithery.ai/server/cbeggroup/getpracticehelp](https://smithery.ai/server/cbeggroup/getpracticehelp)
 - **Privacy:** [gph-mcp-server.pages.dev/privacy](https://gph-mcp-server.pages.dev/privacy)
-- **Support:** questions about this server or its results can go to [info@getpracticehelp.com](mailto:info@getpracticehelp.com), or use the [GetPracticeHelp contact page](https://www.getpracticehelp.com/contact/).
+- **Support:** questions about this server or its results can go to [cbeggroup@gmail.com](mailto:cbeggroup@gmail.com), or use the [GetPracticeHelp contact page](https://www.getpracticehelp.com/contact/).
 
 ## License
 
